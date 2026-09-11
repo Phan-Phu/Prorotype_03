@@ -13,6 +13,8 @@ namespace Prototype.Application
     public class PlayerController : MonoBehaviour
     {
         public GameState State;                    // set by GameManager
+        public IGameplayService GameplayService;  // Infrastructure behavior boundary
+        public IGameWorldService WorldService;     // Infrastructure world query boundary
 
         /// <summary>
         /// Index into State.InventorySystem.Slots (0-9 = row 0, the hotbar row ToolbarUI shows). This
@@ -250,7 +252,7 @@ namespace Prototype.Application
             if (SeedShopUI.IsOpen) return;
 
             GridCoord coord = TargetCoord();
-            if (State.IsSeedShopTile(coord))
+            if (WorldService != null && WorldService.IsSeedShopTile(State, coord))
             {
                 SeedShopUI.OpenCurrent();
                 GameManager.SpawnFeedback(coord, FeedbackKind.Plant);
@@ -268,17 +270,18 @@ namespace Prototype.Application
         }
 
         /// <summary>Maps the active slot's item id to the action it performs. Empty/unrecognised slot = a no-op miss (WrongTool), same as any other invalid tool-use.</summary>
-        ToolResult ResolveAction(string itemId, GridCoord coord)
+        ToolActionDto ResolveAction(string itemId, GridCoord coord)
         {
-            if (itemId == ToolItemIds.Hoe)         return State.UseTool(ToolType.Hoe, coord);
-            if (itemId == ToolItemIds.WateringCan) return State.UseTool(ToolType.WateringCan, coord);
-            if (itemId == ToolItemIds.Harvest)     return State.UseTool(ToolType.Harvest, coord);
-            if (itemId == ToolItemIds.Axe)         return State.UseTool(ToolType.Chop, coord);
+            if (GameplayService == null) return new ToolActionDto(ToolResultCode.WrongTool, FeedbackKind.Miss);
+            if (itemId == ToolItemIds.Hoe)         return GameplayService.UseTool(State, ToolType.Hoe, coord);
+            if (itemId == ToolItemIds.WateringCan) return GameplayService.UseTool(State, ToolType.WateringCan, coord);
+            if (itemId == ToolItemIds.Harvest)     return GameplayService.UseTool(State, ToolType.Harvest, coord);
+            if (itemId == ToolItemIds.Axe)         return GameplayService.UseTool(State, ToolType.Chop, coord);
             if (itemId == Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Turnip))
-                return State.PlantSpecific(Prototype.Domain.CropId.Turnip, coord);
+                return GameplayService.PlantSpecific(State, Prototype.Domain.CropId.Turnip, coord);
             if (itemId == Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Potato))
-                return State.PlantSpecific(Prototype.Domain.CropId.Potato, coord);
-            return ToolResult.Fail(ToolResultCode.WrongTool, FeedbackKind.Miss);
+                return GameplayService.PlantSpecific(State, Prototype.Domain.CropId.Potato, coord);
+            return new ToolActionDto(ToolResultCode.WrongTool, FeedbackKind.Miss);
         }
 
         /// <summary>Friendly label for the active slot's item — HUD shows this instead of a fixed tool name.</summary>

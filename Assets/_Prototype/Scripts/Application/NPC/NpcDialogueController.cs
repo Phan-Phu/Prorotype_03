@@ -12,9 +12,9 @@ namespace Prototype.Application
     public class NpcDialogueController : MonoBehaviour
     {
         public GameState State;
+        public IDialogueService DialogueService;
         public PlayerController Player;
 
-        private readonly DialogueState _dialogue = new DialogueState();
         private NpcDefinition _nearby;
         private Image _dialoguePanel;
         private Image _portraitImage;
@@ -22,7 +22,7 @@ namespace Prototype.Application
         private Text _dialogueText;
         private Text _advanceText;
 
-        public bool IsDialogueOpen => _dialogue.IsOpen;
+        public bool IsDialogueOpen => DialogueService != null && DialogueService.Read().IsOpen;
 
         void Awake()
         {
@@ -56,15 +56,16 @@ namespace Prototype.Application
 
             _nearby = FindNearestNpcInRange();
 
-            if (_dialogue.IsOpen)
+            var dialogue = DialogueService?.Read();
+            if (dialogue != null && dialogue.IsOpen)
             {
                 Player.SetGameplayLocked(true);
                 UpdateDialogueView();
                 if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
-                    _dialogue.AdvanceOrClose();
+                    DialogueService.AdvanceOrClose();
                 if (Input.GetKeyDown(KeyCode.Escape))
-                    _dialogue.Close();
-                if (!_dialogue.IsOpen)
+                    DialogueService.Close();
+                if (!DialogueService.Read().IsOpen)
                 {
                     SetDialogueVisible(false);
                     Player.SetGameplayLocked(false);
@@ -76,7 +77,7 @@ namespace Prototype.Application
             Player.SetGameplayLocked(false);
             if (_nearby != null && Input.GetKeyDown(KeyCode.E))
             {
-                _dialogue.Open(_nearby);
+                DialogueService?.Open(_nearby);
                 Player.SetGameplayLocked(true);
                 UpdateDialogueView();
             }
@@ -127,9 +128,10 @@ namespace Prototype.Application
             var oldContentColor = GUI.contentColor;
             GUI.contentColor = new Color32(42, 30, 20, 255);
 
-            if (_dialogue.IsOpen)
+            var dialogue = DialogueService?.Read();
+            if (dialogue != null && dialogue.IsOpen && _nearby != null)
             {
-                DrawDialogueBox(_dialogue.ActiveNpc, _dialogue.CurrentLine, _dialogue.LineIndex + 1, _dialogue.ActiveNpc.Lines.Length);
+                DrawDialogueBox(_nearby, dialogue.CurrentLine, dialogue.LineIndex + 1, dialogue.LineCount);
                 return;
             }
 
@@ -142,14 +144,15 @@ namespace Prototype.Application
 
         void UpdateDialogueView()
         {
-            if (_dialoguePanel == null || _dialogue.ActiveNpc == null) return;
+            var dialogue = DialogueService?.Read();
+            if (_dialoguePanel == null || dialogue == null || !dialogue.IsOpen || _nearby == null) return;
 
-            var npc = _dialogue.ActiveNpc;
+            var npc = _nearby;
             SetDialogueVisible(true);
-            if (_speakerText != null) _speakerText.text = npc.DisplayName;
-            if (_dialogueText != null) _dialogueText.text = _dialogue.CurrentLine;
+            if (_speakerText != null) _speakerText.text = dialogue.Speaker;
+            if (_dialogueText != null) _dialogueText.text = dialogue.CurrentLine;
             if (_advanceText != null)
-                _advanceText.text = $"E tiếp ({_dialogue.LineIndex + 1}/{npc.Lines.Length}) | Esc đóng";
+                _advanceText.text = $"E tiếp ({dialogue.LineIndex + 1}/{dialogue.LineCount}) | Esc đóng";
 
             if (_portraitImage != null)
             {

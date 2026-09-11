@@ -12,6 +12,8 @@ namespace Prototype.Application
     public class InventoryScreenUI : MonoBehaviour
     {
         public GameState State;
+        public IInventoryService InventoryService;
+        public IInventoryQuery InventoryQuery;
         public PlayerController Player;
         private bool _open;
         private int _dragSlot = -1;
@@ -96,7 +98,9 @@ namespace Prototype.Application
             float dividerH = 1f * scale;
             float rowGap = 10f * scale;
 
-            var inv = State.InventorySystem;
+            var snapshot = InventoryQuery?.Read();
+            var slots = snapshot?.Slots;
+            if (slots == null) { PointerOverUI = false; return; }
             bool mouseUpUnhandled = Event.current.type == EventType.MouseUp && Event.current.button == 0;
 
             for (int row = 0; row < Rows; row++)
@@ -107,20 +111,20 @@ namespace Prototype.Application
                     float slotX = x + leftMargin + col * (slotW + dividerW);
                     float slotY = y + topMargin + (row == 0 ? 0f : slotH + rowGap + (row - 1) * (slotH + dividerH));
                     var slotRect = new Rect(slotX, slotY, slotW, slotH);
-                    var stack = inv.Slots[slotIndex];
+                    var slot = slotIndex < slots.Length ? slots[slotIndex] : default;
 
-                    if (stack != null && slotIndex != _dragSlot)
-                        DrawItem(slotRect, stack);
+                    if (!slot.IsEmpty && slotIndex != _dragSlot)
+                        DrawItem(slotRect, slot);
 
                     if (Event.current.type == EventType.MouseDown && Event.current.button == 0
-                        && slotRect.Contains(mouse) && stack != null)
+                        && slotRect.Contains(mouse) && !slot.IsEmpty)
                     {
                         _dragSlot = slotIndex;
                         Event.current.Use();
                     }
                     else if (mouseUpUnhandled && slotRect.Contains(mouse) && _dragSlot >= 0)
                     {
-                        inv.Swap(_dragSlot, slotIndex);
+                        InventoryService?.Swap(State.InventorySystem, _dragSlot, slotIndex);
                         _dragSlot = -1;
                         mouseUpUnhandled = false;
                         Event.current.Use();
@@ -132,29 +136,29 @@ namespace Prototype.Application
             if (mouseUpUnhandled && _dragSlot >= 0)
                 _dragSlot = -1;
 
-            if (_dragSlot >= 0 && inv.Slots[_dragSlot] != null)
+            if (_dragSlot >= 0 && _dragSlot < slots.Length && !slots[_dragSlot].IsEmpty)
             {
                 var followRect = new Rect(mouse.x - slotW * 0.4f, mouse.y - slotH * 0.4f, slotW * 0.8f, slotH * 0.8f);
-                DrawItem(followRect, inv.Slots[_dragSlot]);
+                DrawItem(followRect, slots[_dragSlot]);
             }
 
             GUI.Label(new Rect(x, y - 20f, w, 20f), "Inventory (I to close) — drag to reorder");
             GUI.contentColor = oldContentColor;
         }
 
-        static void DrawItem(Rect rect, Prototype.Domain.ItemStack stack)
+        static void DrawItem(Rect rect, InventorySlotData slot)
         {
-            var icon = PlaceholderArt.ItemIcon(stack.ItemId);
+            var icon = PlaceholderArt.ItemIcon(slot.ItemId);
             if (icon != null)
             {
                 // B2 (Sprint 1): tint the shared seed sprite per crop (turnip vs potato).
                 var prevColor = GUI.color;
-                GUI.color = PlaceholderArt.ItemTint(stack.ItemId);
+                GUI.color = PlaceholderArt.ItemTint(slot.ItemId);
                 PlaceholderArt.DrawSpriteFit(PlaceholderArt.Shrink(rect, 0.15f), icon);
                 GUI.color = prevColor;
             }
-            if (stack.Count > 1)
-                GUI.Label(new Rect(rect.xMax - 22f, rect.yMax - 18f, 20f, 16f), stack.Count.ToString());
+            if (slot.Count > 1)
+                GUI.Label(new Rect(rect.xMax - 22f, rect.yMax - 18f, 20f, 16f), slot.Count.ToString());
         }
     }
 }

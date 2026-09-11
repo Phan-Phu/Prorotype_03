@@ -10,24 +10,26 @@ namespace Prototype.Application
     {
         readonly GameState _state;
         readonly IInventoryQuery _inventoryQuery;
+        readonly IClockService _clockService;
 
-        public GameStateApplicationService(GameState state, IInventoryQuery inventoryQuery)
+        public GameStateApplicationService(GameState state, IInventoryQuery inventoryQuery, IClockService clockService)
         {
             _state = state;
             _inventoryQuery = inventoryQuery;
+            _clockService = clockService;
         }
 
         public GameStateSnapshotDto Read() => ToSnapshot();
 
         public GameStateSnapshotDto Advance(AdvanceTimeRequest request)
         {
-            _state.Clock.Tick(request.DeltaSeconds);
+            _clockService.Tick(_state, request.DeltaSeconds);
             return ToSnapshot();
         }
 
         GameStateSnapshotDto ToSnapshot()
             => new GameStateSnapshotDto(
-                new GameClockDto(_state.Clock.Day, _state.Clock.Hour),
+                _clockService.Read(_state),
                 _state.Wallet.Money,
                 _state.Stamina.Current,
                 _state.PlayerPosition,

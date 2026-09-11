@@ -44,6 +44,9 @@ namespace Prototype.Application
         public static string RunGreedyFarmer(int days, int seed, CropId? forceCrop = null)
         {
             var state = new GameState(seed: seed);
+            var inventory = new InventoryService();
+            var gameplay = new GameplayService(inventory);
+            var clock = new ClockService();
             var plots = new List<GridCoord>(MaxWorkingPlots);
             var claimed = new HashSet<GridCoord>();
 
@@ -61,7 +64,7 @@ namespace Prototype.Application
                 {
                     var tile = state.Grid.GetTile(c);
                     if (tile?.Crop != null && tile.Crop.IsRipe)
-                        if (state.UseTool(ToolType.Harvest, c).IsSuccess) harvested++;
+                        if (gameplay.UseTool(state, ToolType.Harvest, c).IsSuccess) harvested++;
                 }
 
                 // 2. Chop every standing tree the farmer can reach this day (S2-DEV-07,
@@ -69,14 +72,14 @@ namespace Prototype.Application
                 // accidentally out-earning crops, so the "greedy" farmer must actually chop, not just
                 // farm). Reachability/travel time isn't modelled by this sim (see MaxWorkingPlots doc);
                 // it works every tree it can afford in stamina before moving on to farming for the day.
-                int woodHarvested = ChopAllTrees(state);
+                int woodHarvested = ChopAllTrees(state, gameplay);
 
                 // 3. Claim new plots (till fresh grass) up to the working cap, stamina permitting.
                 while (plots.Count < MaxWorkingPlots)
                 {
                     var found = FindFreeGrassTile(state, claimed);
                     if (found == null) break; // ran out of grass on this grid
-                    if (!state.UseTool(ToolType.Hoe, found.Value).IsSuccess) break; // out of stamina
+                    if (!gameplay.UseTool(state, ToolType.Hoe, found.Value).IsSuccess) break; // out of stamina
                     plots.Add(found.Value);
                     claimed.Add(found.Value);
                 }
@@ -88,9 +91,8 @@ namespace Prototype.Application
                     if (tile == null || tile.Crop != null) continue;
                     var crop = ChooseCrop(state, forceCrop);
                     if (crop == null) continue; // can't afford anything for this plot right now
-                    state.Wallet.TrySpend(CropDefinition.SeedPrice(crop.Value));
-                    state.InventorySystem.Add(CropDefinition.SeedItemId(crop.Value), 1);
-                    state.PlantSpecific(crop.Value, c);
+                    if (!gameplay.BuySeed(state, crop.Value).IsSuccess) continue;
+                    gameplay.PlantSpecific(state, crop.Value, c);
                 }
 
                 // 5. Water everything planted (IsWatered resets every day rollover — CropInstance only
@@ -99,18 +101,23 @@ namespace Prototype.Application
                 {
                     var tile = state.Grid.GetTile(c);
                     if (tile?.Crop != null && !tile.IsWatered)
-                        state.UseTool(ToolType.WateringCan, c);
+                        gameplay.UseTool(state, ToolType.WateringCan, c);
                 }
 
                 // 6. Sell carried produce and wood through the same sell channel a real interaction
                 // uses; harvest itself only adds produce to inventory, it no longer credits Wallet.
-                state.SellAllCrops();
-                int woodIncome = state.SellAllWood();
+                gameplay.SellItem(state, CropDefinition.ProduceItemId(CropId.Turnip),
+                    CropDefinition.SellPrice(CropId.Turnip), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Turnip)));
+                gameplay.SellItem(state, CropDefinition.ProduceItemId(CropId.Potato),
+                    CropDefinition.SellPrice(CropId.Potato), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Potato)));
+                var woodResult = gameplay.SellItem(state, TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice,
+                    inventory.Count(state.InventorySystem, TreeDefinition.WoodItemId));
+                int woodIncome = woodResult.Earned;
 
                 int staminaUsed = staminaStart - state.Stamina.Current;
                 sb.AppendLine($"{state.Clock.Day},{state.Wallet.Money},{plots.Count},{staminaUsed},{harvested},{woodHarvested},{woodIncome}");
 
-                state.SkipDay();
+                clock.ForceEndDay(state);
             }
 
             return sb.ToString();
@@ -133,7 +140,7 @@ namespace Prototype.Application
 
         /// <summary>Deterministic top-left-to-bottom-right scan, chopping every standing tree down to a
         /// stump (or until stamina runs out). Returns total wood gained this call.</summary>
-        static int ChopAllTrees(GameState state)
+        static int ChopAllTrees(GameState state, IGameplayService gameplay)
         {
             int wood = 0;
             for (int y = 0; y < state.Grid.Height; y++)
@@ -143,7 +150,7 @@ namespace Prototype.Application
                     var tile = state.Grid.GetTile(c);
                     while (tile.Object != null && tile.Object.IsAlive)
                     {
-                        var r = state.UseTool(ToolType.Chop, c);
+                        var r = gameplay.UseTool(state, ToolType.Chop, c);
                         if (!r.IsSuccess) return wood; // out of stamina — stop for the day
                         wood += r.Amount; // >0 only on the felling hit
                     }

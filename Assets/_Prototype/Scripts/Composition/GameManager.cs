@@ -20,6 +20,7 @@ namespace Prototype.Application
         private DebugPanel _debug;
         private IGameTimeUseCase _timeUseCase;
         private IGameStateRepository _stateRepository;
+        private IGameWorldService _worldService;
         // Keep Unity coupled to the DI abstraction. The concrete Microsoft provider stays
         // inside this composition root, which makes the rest of the game portable and avoids
         // relying on provider-specific APIs during domain/application execution.
@@ -46,7 +47,7 @@ namespace Prototype.Application
             _stateRepository = new InMemoryGameStateRepository();
             State = _stateRepository.Load(20, 20, Prototype.Application.BootArgs.Seed);
             State.Clock.Day = Mathf.Max(1, Prototype.Application.BootArgs.StartDay);
-            State.SetMoney(Prototype.Application.BootArgs.StartMoney);
+            State.Wallet.Money = Prototype.Application.BootArgs.StartMoney;
 
             ConfigureServices(_stateRepository);
 
@@ -66,11 +67,21 @@ namespace Prototype.Application
         {
             var services = new ServiceCollection();
             services.AddSingleton(stateRepository);
-            services.AddSingleton<Prototype.Domain.IInventoryReader>(State.InventorySystem);
             // Keep the application boundary explicit: domain state is mapped to DTOs once at the
             // composition root, then views consume the query/use-case interfaces.
-            var inventoryQuery = new InventoryQuery(State.InventorySystem);
-            var stateService = new GameStateApplicationService(State, inventoryQuery);
+            var inventoryService = new InventoryService();
+            var inventoryQuery = new InventoryQuery(inventoryService, State.InventorySystem);
+            var clockService = new ClockService();
+            var gameplayService = new GameplayService(inventoryService);
+            var dialogueService = new DialogueService();
+            var worldService = new GameWorldService();
+            _worldService = worldService;
+            var stateService = new GameStateApplicationService(State, inventoryQuery, clockService);
+            services.AddSingleton<IInventoryService>(inventoryService);
+            services.AddSingleton<IClockService>(clockService);
+            services.AddSingleton<IGameplayService>(gameplayService);
+            services.AddSingleton<IDialogueService>(dialogueService);
+            services.AddSingleton<IGameWorldService>(worldService);
             services.AddSingleton<IInventoryQuery>(inventoryQuery);
             services.AddSingleton<IGameStateQuery>(stateService);
             services.AddSingleton<IGameTimeUseCase>(stateService);
@@ -192,6 +203,8 @@ namespace Prototype.Application
                 _player = go.AddComponent<PlayerController>();
             }
             _player.State = State;
+            _player.GameplayService = _services.GetRequiredService<IGameplayService>();
+            _player.WorldService = _worldService;
         }
 
         void SetupHud()
@@ -226,6 +239,8 @@ namespace Prototype.Application
                 inv = go.AddComponent<InventoryScreenUI>();
             }
             inv.State = State;
+            inv.InventoryService = _services.GetRequiredService<IInventoryService>();
+            inv.InventoryQuery = _services.GetRequiredService<IInventoryQuery>();
             inv.Player = _player;
         }
 
@@ -239,7 +254,7 @@ namespace Prototype.Application
             sr.color = PlaceholderArt.ItemIcon(turnipSeed) != null
                 ? PlaceholderArt.ItemTint(turnipSeed)
                 : new Color(0.95f, 0.8f, 0.2f);
-            sr.transform.position = State.Grid.GridToWorld(State.SeedShopCoord);
+            sr.transform.position = State.Grid.GridToWorld(_worldService.SeedShopCoord(State));
             sr.transform.localScale = new Vector3(0.8f, 0.8f, 1f);
             sr.sortingOrder = 4;
 
@@ -250,6 +265,8 @@ namespace Prototype.Application
                 shop = label.AddComponent<SeedShopUI>();
             }
             shop.State = State;
+            shop.GameplayService = _services.GetRequiredService<IGameplayService>();
+            shop.InventoryService = _services.GetRequiredService<IInventoryService>();
             shop.Player = _player;
         }
 
@@ -262,6 +279,7 @@ namespace Prototype.Application
                 npc = go.AddComponent<NpcDialogueController>();
             }
             npc.State = State;
+            npc.DialogueService = _services.GetRequiredService<IDialogueService>();
             npc.Player = _player;
         }
 
@@ -274,6 +292,10 @@ namespace Prototype.Application
                 _debug = go.AddComponent<DebugPanel>();
             }
             _debug.State = State;
+            _debug.ClockService = _services.GetRequiredService<IClockService>();
+            _debug.InventoryService = _services.GetRequiredService<IInventoryService>();
+            _debug.GameplayService = _services.GetRequiredService<IGameplayService>();
+            _debug.WorldService = _worldService;
             _debug.Player = _player;
         }
 

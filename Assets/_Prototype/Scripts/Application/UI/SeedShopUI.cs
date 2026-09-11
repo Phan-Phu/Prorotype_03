@@ -13,6 +13,8 @@ namespace Prototype.Application
         public static bool IsOpen => Instance != null && Instance._open;
 
         public GameState State;
+        public IGameplayService GameplayService;
+        public IInventoryService InventoryService;
         public PlayerController Player;
         public string LastFeedback => _feedbackText != null ? _feedbackText.text : string.Empty;
 
@@ -182,7 +184,8 @@ namespace Prototype.Application
                 var seedId = CropDefinition.SeedItemId(crop);
                 var price = CropDefinition.SeedPrice(crop);
                 _detailTitle.text = $"{Label(crop)} Seed";
-                _detailText.text = $"Plant this seed on prepared soil.\n\nPrice: {price}g\nOwned: {State.InventorySystem.Count(seedId)}";
+                int owned = InventoryService != null ? InventoryService.Count(State.InventorySystem, seedId) : 0;
+                _detailText.text = $"Plant this seed on prepared soil.\n\nPrice: {price}g\nOwned: {owned}";
                 _priceText.text = $"{price}g   Money: {State.Wallet.Money}";
                 _buyButton.interactable = true;
             }
@@ -192,7 +195,13 @@ namespace Prototype.Application
 
         public ShopPurchaseResult Buy(CropId crop)
         {
-            var result = State.BuySeed(crop);
+            var dto = GameplayService != null
+                ? GameplayService.BuySeed(State, crop)
+                : new ShopPurchaseDto(new ShopPurchaseResult(ShopPurchaseResultCode.InsufficientFunds,
+                    crop, CropDefinition.SeedItemId(crop), CropDefinition.SeedPrice(crop),
+                    State.Wallet.Money, State.Wallet.Money, 0, 0));
+            var result = new ShopPurchaseResult(dto.Code, dto.Crop, dto.ItemId, dto.Price,
+                dto.MoneyBefore, dto.MoneyAfter, dto.CountBefore, dto.CountAfter);
             SessionLogger.LogShopPurchase(State, result);
             _feedbackText.text = result.IsSuccess ? $"Bought {Label(crop)} seed" : result.Code == ShopPurchaseResultCode.InsufficientFunds ? "Not enough money" : "Inventory full";
             RefreshUi();
@@ -206,7 +215,7 @@ namespace Prototype.Application
 
         public ShopSellResult SellWood()
         {
-            int count = State.InventorySystem.Count(TreeDefinition.WoodItemId);
+            int count = InventoryService != null ? InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId) : 0;
             return SellItem(TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, count, "Wood");
         }
 
@@ -216,7 +225,8 @@ namespace Prototype.Application
         public ShopSellResult SellCrop(CropId crop)
         {
             string itemId = CropDefinition.ProduceItemId(crop);
-            return SellItem(itemId, CropDefinition.SellPrice(crop), State.InventorySystem.Count(itemId), Label(crop));
+            int count = InventoryService != null ? InventoryService.Count(State.InventorySystem, itemId) : 0;
+            return SellItem(itemId, CropDefinition.SellPrice(crop), count, Label(crop));
         }
 
         public ShopSellResult SellItem(string itemId, int pricePerUnit, int count)
@@ -224,7 +234,12 @@ namespace Prototype.Application
 
         ShopSellResult SellItem(string itemId, int pricePerUnit, int count, string displayName)
         {
-            var result = State.SellItem(itemId, pricePerUnit, count);
+            var dto = GameplayService != null
+                ? GameplayService.SellItem(State, itemId, pricePerUnit, count)
+                : new ShopSellDto(new ShopSellResult(ShopSellResultCode.EmptyInventory, itemId,
+                    pricePerUnit, count, 0, State.Wallet.Money, State.Wallet.Money, 0, 0));
+            var result = new ShopSellResult(dto.Code, dto.ItemId, pricePerUnit, count, dto.Earned,
+                dto.MoneyBefore, dto.MoneyAfter, dto.CountBefore, dto.CountAfter);
             _feedbackText.text = result.IsSuccess
                 ? $"Sold {displayName} for {result.Earned}g"
                 : $"No {displayName} to sell";

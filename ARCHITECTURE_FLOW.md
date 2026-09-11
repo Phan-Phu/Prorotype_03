@@ -7,7 +7,7 @@ that actually exist in the project.
 ## 0. High-level runtime flow
 
 The following diagram shows how input travels through the current Unity scene,
-application components and domain state before the UI is refreshed.
+application components and Infrastructure services before the UI is refreshed.
 
 ```mermaid
 flowchart LR
@@ -17,20 +17,20 @@ flowchart LR
         World[World objects\nmap / player / NPCs]
     end
 
-    Bootstrap[GameManager\ncomposition root] --> State[GameState]
-    Bootstrap --> DI[Microsoft DI\nInventoryQuery adapter]
+    Bootstrap[GameManager\ncomposition root] --> DI[Microsoft DI]
+    DI --> Infra[Infrastructure services\nUniTask + DTO mapping]
+    Infra --> State[Domain raw state]
 
     Input --> Player[PlayerController]
     Input --> UIIntent[UI intent\nbutton / selection / dialogue]
-    Player --> Actions[Application action mapping]
+    Player --> Actions[Application controllers]
     UIIntent --> Actions
-    Actions --> Domain[Domain rules\nToolController / SeedShop / DialogueState]
-    Domain --> State
-    State --> Query[InventoryQuery / DTO snapshots]
-    State --> World
-    State --> HUD[HUD / clock]
+    Actions --> Infra
+    Infra --> Query[DTO snapshots]
+    Infra --> World
+    Infra --> HUD[HUD DTO / clock]
     Query --> Canvas
-    Domain --> Canvas
+    Infra --> Canvas
     World --> Canvas
 
     subgraph Features[Feature flows]
@@ -41,15 +41,15 @@ flowchart LR
     Actions --> Farm
     Actions --> Economy
     Actions --> NPC
-    Farm --> State
-    Economy --> State
-    NPC --> State
+    Farm --> Infra
+    Economy --> Infra
+    NPC --> Infra
 ```
 
 Runtime ownership is intentionally explicit: the scene owns layout and art
-references, Application owns input-to-view coordination, and Domain owns
-state transitions and validation. UI never becomes the source of truth for
-inventory, wallet, crops or time.
+references, Application owns input-to-view coordination, Infrastructure owns
+behavior and DTO conversion, and Domain owns raw state/data contracts. UI never
+becomes the source of truth for inventory, wallet, crops or time.
 
 ## 1. Current layer map
 
@@ -59,8 +59,6 @@ Unity scene / Unity lifecycle
         ▼
 Prototype.Application
   GameManager          composition root and runtime bootstrap
-  GameStateApplicationService
-                       DTO mapping and time use case boundary
   PlayerController     input, movement, active-slot actions
   WorldView            world rendering
   HUD                 HUD rendering
@@ -69,31 +67,29 @@ Prototype.Application
   SeedShopUI           UGUI shop and shop actions
   NpcDialogueController NPC interaction and dialogue presentation
   DebugPanel           debug-only controls
+        │ calls Infrastructure only
+        ▼
+Prototype.Infrastructure
+  InventoryService / InventoryQuery / DTOs / UniTask
+  ClockService / GameplayService / DialogueService
+  GameStateApplicationService / repository adapters
+  ArtCatalog / PlaceholderArt / SessionLogger
         │
-        │ calls directly
+        │ reads and mutates raw models through ports
         ▼
 Prototype.Domain
   Entities/      GameState, GridMap, TileData, CropInstance,
                  Inventory, Wallet, Stamina, GameClock, NPC state
   ValueObjects/  GridCoord, ItemStack, tool result/value types
-  Services/      ToolController, SeedShop
   Policies/      BalanceConfig, crop/tree definitions
   Ports/         IGameStateRepository, IInventoryReader
-        │
-        ▼
-Prototype.Application adapters
-  InventoryQuery / DTOs / use cases
-  ArtCatalog / PlaceholderArt
-  SessionLogger
-
-Prototype.Infrastructure implementations
-  InMemoryGameStateRepository
-  Unity art and telemetry adapters
 ```
 
-`Presentation` has been merged into `Application`. All runtime and UI code now
-uses `Prototype.Application`; domain rules use `Prototype.Domain`. There is no
-`Farm.Prototype.*` namespace in the current source.
+`Presentation` has been merged into `Application`. Feature actions call
+Infrastructure services and consume their DTOs. Domain contains no DTOs. The
+world renderer still receives the raw runtime aggregate through the composition
+root for map/collision/sprite queries; new state mutation must go through
+Infrastructure. There is no `Farm.Prototype.*` namespace in the current source.
 
 The physical folders under `Assets/_Prototype/Scripts/Application/` are only
 for navigation (`UI`, `Player`, `NPC`, `World`, `Debug`, etc.). They are not
@@ -105,34 +101,33 @@ separate architectural layers.
 sequenceDiagram
     participant U as Unity
     participant G as GameManager
-    participant S as GameState
     participant D as Microsoft DI
-    participant A as GameStateApplicationService
+    participant I as Infrastructure services
+    participant S as Domain raw state
     participant C as Application components
 
     U->>G: AfterSceneLoad bootstrap
-    G->>S: new GameState(BootArgs.Seed)
-    G->>S: apply start day and start money
-    G->>D: register IInventoryReader and IInventoryQuery
-    G->>A: register state query and time use case
+    G->>D: register Infrastructure services
+    D->>I: Inventory / Clock / Gameplay / Dialogue services
+    I->>S: create/read raw state
     G->>C: find or create camera/world/player/HUD/UI/NPC/debug
     G->>C: assign State, DTO query and Player references
     loop every frame
-        G->>A: Advance(AdvanceTimeRequest)
-        A->>S: GameClock.Tick(deltaTime)
-        A-->>C: GameStateSnapshotDto
+        G->>I: TickAsync / DTO query
+        I->>S: update raw state
+        I-->>C: GameStateSnapshotDto / feature DTO
     end
 ```
 
 `GameManager` is the actual composition root. It creates the domain state,
 builds the Microsoft DI service provider, then wires the MonoBehaviours. The
 shared time/read boundary is `GameStateApplicationService`; feature-specific
-controllers still call the domain action methods directly until those use
-cases need their own application services.
+controllers call Infrastructure services; Domain is not exposed to UI.
 
-Infrastructure does not duplicate Domain entity logic. It implements Domain
-ports such as `IGameStateRepository`; the in-memory adapter currently creates
-and holds the aggregate, while a file/cloud adapter can replace it later.
+Infrastructure owns behavior over the raw entities and implements Domain ports
+such as `IGameStateRepository`; the in-memory adapter currently creates and
+holds the aggregate, while a file/cloud adapter can replace it later. DTOs are
+created in Infrastructure, never in Domain.
 
 Important bootstrap behavior:
 
@@ -190,9 +185,8 @@ erDiagram
     }
 ```
 
-`GameState` is the shared state boundary used by runtime, tests and the
-headless simulation. `ToolController` and `SeedShop` are plain domain rules;
-they return structured results instead of updating UI.
+`GameState` is the raw state boundary used internally by Infrastructure. DTOs
+are created only at the Infrastructure boundary for Application/UI consumers.
 
 ## 4. Player action flow
 
@@ -204,15 +198,17 @@ PlayerController.Update()
 read active Inventory slot
       ↓
 resolve item to action
-      ├─ Hoe / WateringCan / Harvest / Axe → GameState.UseTool()
-      ├─ Turnip/Potato seed                → GameState.PlantSpecific()
+      ├─ Hoe / WateringCan / Harvest / Axe → GameplayService.UseTool()
+      ├─ Turnip/Potato seed                → GameplayService.PlantSpecific()
       └─ interaction tile                  → SeedShopUI.OpenCurrent()
       ↓
-ToolController validates tile, stamina, inventory and object state
+Infrastructure validates tile, stamina, inventory and object state
       ↓
-GameState mutates Grid / Inventory / Wallet / Stamina
+Infrastructure mutates Domain raw state
       ↓
-PlayerController and UI components redraw from current state
+Infrastructure returns ToolActionDto / feature DTO
+      ↓
+PlayerController and UI components redraw
 ```
 
 Tree collision and the cursor use the same `GridMap.IsOccupied()` query. A
@@ -224,7 +220,7 @@ felled tree remains an occupied tile until its respawn countdown completes.
 sequenceDiagram
     participant P as PlayerController
     participant V as SeedShopUI
-    participant D as SeedShop / GameState
+    participant D as GameplayService
     participant I as Inventory
     participant W as Wallet
 
@@ -234,10 +230,10 @@ sequenceDiagram
     P->>V: select item
     V->>V: show detail, price and owned count
     P->>V: BuySelectedItem()
-    V->>D: State.BuySeed(crop)
+    V->>D: BuySeed(crop)
     D->>W: validate and spend money
     D->>I: add seed when capacity allows
-    D-->>V: ShopPurchaseResult
+    D-->>V: ShopPurchaseDto
     V->>V: show feedback and refresh price/owned count
 ```
 
@@ -251,20 +247,20 @@ Inspector-callable entry points are:
 - `ShowItemDetail(string)`, `ShowTurnipSeedDetail`, `ShowPotatoSeedDetail`
 - `BuySelectedItem`, `BuyTurnipItem`, `BuyPotatoItem`
 
-The domain transaction is atomic with respect to insufficient funds and full
-inventory: it validates before changing wallet or inventory.
+The Infrastructure transaction is atomic with respect to insufficient funds
+and full inventory: it validates before changing Domain raw state.
 
 ## 6. Toolbar, HUD and inventory flow
 
 ```text
-GameState.InventorySystem
+Infrastructure InventoryService
         │
         ├─ GameStateApplicationService → GameStateSnapshotDto
         │                              ├─ GameClockDto → HUD
         │                              └─ InventorySnapshot / InventorySlotData
         │                                  → ToolbarCanvasUI
         │
-        ├─ direct state read → HUD / InventoryScreenUI
+        ├─ InventoryQuery → InventoryScreenUI
         │
         └─ active slot → PlayerController action resolution
 ```
@@ -322,8 +318,9 @@ They are not domain rules.
 - `HeadlessSim` runs the same `GameState`/domain rules for economy checks.
 - Unity CLI is used for compile/test/build validation.
 
-The current implementation is a pragmatic layered architecture, not a fully
-separated MVC/CQRS application. UI MonoBehaviours still contain some controller
-logic and call `GameState` directly. New features should keep rules in Domain,
-put UI intent/state mapping in Application, and leave layout/art references in
-the scene or art catalog.
+The current implementation uses a pragmatic MVC-like Application layer: UI
+MonoBehaviours own input/presentation coordination, while feature behavior is
+delegated to Infrastructure services. Some world-rendering components still
+receive the aggregate through the composition root because they need map,
+collision and sprite data. New state mutation must remain behind an
+Infrastructure service and new DTOs must remain outside Domain.

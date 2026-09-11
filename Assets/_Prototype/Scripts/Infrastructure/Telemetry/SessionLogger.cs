@@ -24,12 +24,12 @@ namespace Prototype.Application
         /// <summary>Pure formatting — no file IO, EditMode-testable.</summary>
         public static string FormatRow(int day, int hour, string action, Prototype.Domain.GridCoord tile,
             string result, int money, int stamina)
-            => $"{day},{Prototype.Domain.GameClock.WrapHour(hour):00}:00,{action},{tile},{result},{money},{stamina}";
+            => $"{day},{ClockService.WrapHour(hour):00}:00,{action},{tile},{result},{money},{stamina}";
 
         /// <summary>Pure shop-log formatting for DSN-040 QA metrics.</summary>
         public static string FormatShopRow(int day, int hour, string evt, string item, string result,
             int moneyBefore, int moneyAfter, int countBefore, int countAfter)
-            => $"{day},{Prototype.Domain.GameClock.WrapHour(hour):00}:00,{evt},{item},{result},{moneyBefore},{moneyAfter},{countBefore},{countAfter}";
+            => $"{day},{ClockService.WrapHour(hour):00}:00,{evt},{item},{result},{moneyBefore},{moneyAfter},{countBefore},{countAfter}";
 
         private static string _path;
         private static int _cachedSeed;

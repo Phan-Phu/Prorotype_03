@@ -18,12 +18,31 @@ outside this repository.
 
 ## Architecture
 
-- `Prototype.Domain`: game state and rules without UI responsibilities.
-- `Prototype.Application`: runtime controllers, views, UI, composition and
-  infrastructure adapters.
+- `Prototype.Domain`: raw entities, value objects, policies and ports. It has
+  no Unity UI, DTOs, async code or feature/service behavior. Setters are kept
+  for MasterData import/runtime composition only.
+- `Prototype.Application`: the merged UI/controller layer (Presentation was
+  intentionally removed). It receives input, binds scene-authored UI and
+  consumes Infrastructure services/DTOs.
+- Infrastructure implementations live under `Scripts/Infrastructure/` and
+  own inventory, clock, farming/economy, dialogue and world/debug behavior.
+  The namespace is intentionally limited to `Prototype.Application` or
+  `Prototype.Domain`.
+- Infrastructure exposes UniTask async entry points (`ReadAsync`, `TickAsync`,
+  `UseToolAsync`, `BuySeedAsync`, `SellItemAsync`, dialogue and debug async
+  methods) so storage/MasterData can become asynchronous later.
 - UI is UGUI-based. Scene-authored objects provide the layout; application
   components bind state and user intent at runtime.
 - The main scene owns the authored canvas and toolbar hierarchy.
+
+The runtime dependency direction is:
+
+```text
+Application UI/controllers  ->  Infrastructure services + DTOs  ->  Domain raw state/ports
+```
+
+`GameManager` is the composition root and the only place that builds the
+Microsoft DI container. Domain does not reference Infrastructure or Unity UI.
 
 ## Run in Unity
 

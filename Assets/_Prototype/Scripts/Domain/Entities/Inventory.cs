@@ -11,6 +11,13 @@ namespace Prototype.Domain
         public const int Rows = 4; // 1 hotbar row + 3 backpack rows
         public const int SlotCount = Columns * Rows;
 
+        // Raw master-data fields. Infrastructure is responsible for applying behavior to these
+        // values; the setters are reserved for MasterData import/runtime composition.
+        // SET chỉ được sử dụng bởi Infrastructure khi import MasterData.
+        public int ColumnCount { get; set; } = Columns;
+        public int RowCount { get; set; } = Rows;
+        public bool[] LockedSlots { get; set; } = new bool[SlotCount];
+
         public readonly ItemStack[] Slots = new ItemStack[SlotCount];
 
         int Prototype.Domain.IInventoryReader.SlotCount => SlotCount;
@@ -18,56 +25,7 @@ namespace Prototype.Domain
         ItemStack Prototype.Domain.IInventoryReader.GetSlot(int index)
             => index < 0 || index >= SlotCount ? null : Slots[index];
 
-        /// <summary>True if Add(itemId) would stack into an existing pile or occupy an empty slot.</summary>
-        public bool CanAdd(string itemId)
-        {
-            for (int i = 0; i < SlotCount; i++)
-                if (Slots[i] != null && Slots[i].ItemId == itemId) return true;
-            for (int i = 0; i < SlotCount; i++)
-                if (Slots[i] == null) return true;
-            return false;
-        }
-
-        /// <summary>Stacks onto an existing pile of the same item first, else fills the first empty slot. Returns false if full.</summary>
-        public bool Add(string itemId, int n = 1)
-        {
-            for (int i = 0; i < SlotCount; i++)
-                if (Slots[i] != null && Slots[i].ItemId == itemId) { Slots[i].Add(n); return true; }
-            for (int i = 0; i < SlotCount; i++)
-                if (Slots[i] == null) { Slots[i] = new ItemStack(itemId, n); return true; }
-            return false;
-        }
-
-        public int Count(string itemId)
-        {
-            int c = 0;
-            foreach (var s in Slots) if (s != null && s.ItemId == itemId) c += s.Count;
-            return c;
-        }
-
-        /// <summary>Consumes n of itemId from wherever it's stacked; returns false (no change) if there isn't enough in any one slot.</summary>
-        public bool TryRemove(string itemId, int n = 1)
-        {
-            for (int i = 0; i < SlotCount; i++)
-            {
-                if (Slots[i] == null || Slots[i].ItemId != itemId || Slots[i].Count < n) continue;
-                Slots[i].Remove(n);
-                if (Slots[i].Count <= 0) Slots[i] = null;
-                return true;
-            }
-            return false;
-        }
-
-        /// <summary>Swaps the contents of two slots (drag-and-drop reorder in InventoryScreenUI). No-op on an out-of-range index.</summary>
-        public void Swap(int a, int b)
-        {
-            if (a < 0 || a >= SlotCount || b < 0 || b >= SlotCount || a == b) return;
-            (Slots[a], Slots[b]) = (Slots[b], Slots[a]);
-        }
-
-        public void Clear()
-        {
-            for (int i = 0; i < SlotCount; i++) Slots[i] = null;
-        }
+        // Inventory behavior is implemented by Infrastructure.InventoryService.
+        // This entity intentionally exposes raw slots only; it does not own commands.
     }
 }

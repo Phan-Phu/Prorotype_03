@@ -25,7 +25,7 @@ namespace Prototype.Application
         {
             Day = day;
             RawHour = rawHour;
-            DisplayHour = GameClock.WrapHour(rawHour);
+            DisplayHour = ClockService.WrapHour(rawHour);
         }
     }
 

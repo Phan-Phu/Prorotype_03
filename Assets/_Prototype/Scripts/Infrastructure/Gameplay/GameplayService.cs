@@ -34,7 +34,7 @@ namespace Prototype.Application
             if (state == null || !state.Grid.InBounds(coord)) return Fail(ToolResultCode.InvalidTile);
             var tile = state.Grid.GetTile(coord);
             if (!CanPlant(tile, out var failure)) return failure;
-            if (!_inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(crop)))
+            if (!_inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(crop)).GetAwaiter().GetResult())
                 return Fail(ToolResultCode.NoSeed);
             tile.Crop = new CropInstance(crop);
             return Success(FeedbackKind.Plant);
@@ -45,20 +45,20 @@ namespace Prototype.Application
             string itemId = CropDefinition.SeedItemId(crop);
             int price = CropDefinition.SeedPrice(crop);
             int moneyBefore = state.Wallet.Money;
-            int countBefore = _inventory.Count(state.InventorySystem, itemId);
+            int countBefore = _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult();
             ShopPurchaseResultCode code;
 
             if (moneyBefore < price) code = ShopPurchaseResultCode.InsufficientFunds;
-            else if (!_inventory.CanAdd(state.InventorySystem, itemId)) code = ShopPurchaseResultCode.InventoryFull;
+            else if (!_inventory.CanAdd(state.InventorySystem, itemId).GetAwaiter().GetResult()) code = ShopPurchaseResultCode.InventoryFull;
             else
             {
                 state.Wallet.Money -= price;
-                _inventory.Add(state.InventorySystem, itemId);
+                _inventory.Add(state.InventorySystem, itemId).GetAwaiter().GetResult();
                 code = ShopPurchaseResultCode.Success;
             }
 
             var result = new ShopPurchaseResult(code, crop, itemId, price, moneyBefore, state.Wallet.Money,
-                countBefore, _inventory.Count(state.InventorySystem, itemId));
+                countBefore, _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult());
             return new ShopPurchaseDto(result);
         }
 
@@ -68,17 +68,17 @@ namespace Prototype.Application
         public ShopSellDto SellItem(GameState state, string itemId, int pricePerUnit, int count)
         {
             int moneyBefore = state.Wallet.Money;
-            int countBefore = _inventory.Count(state.InventorySystem, itemId);
-            if (count <= 0 || countBefore < count || !_inventory.Remove(state.InventorySystem, itemId, count))
+            int countBefore = _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult();
+            if (count <= 0 || countBefore < count || !_inventory.Remove(state.InventorySystem, itemId, count).GetAwaiter().GetResult())
                 return new ShopSellDto(new ShopSellResult(ShopSellResultCode.EmptyInventory, itemId,
                     pricePerUnit, count, 0, moneyBefore, moneyBefore, countBefore,
-                    _inventory.Count(state.InventorySystem, itemId)));
+                    _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult()));
 
             int earned = pricePerUnit * count;
             state.Wallet.Money += earned;
             return new ShopSellDto(new ShopSellResult(ShopSellResultCode.Success, itemId, pricePerUnit,
                 count, earned, moneyBefore, state.Wallet.Money, countBefore,
-                _inventory.Count(state.InventorySystem, itemId)));
+                _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult()));
         }
 
         public UniTask<ShopSellDto> SellItemAsync(GameState state, string itemId, int pricePerUnit, int count)
@@ -101,7 +101,7 @@ namespace Prototype.Application
             tile.Object.HP--;
             if (tile.Object.HP > 0) return Success(FeedbackKind.Chop);
             tile.Object.RespawnDaysLeft = TreeDefinition.RespawnDays;
-            _inventory.Add(state.InventorySystem, TreeDefinition.WoodItemId, TreeDefinition.WoodPerTree);
+            _inventory.Add(state.InventorySystem, TreeDefinition.WoodItemId, TreeDefinition.WoodPerTree).GetAwaiter().GetResult();
             return Success(FeedbackKind.Chop, TreeDefinition.WoodPerTree);
         }
 
@@ -109,8 +109,8 @@ namespace Prototype.Application
         {
             if (!CanPlant(tile, out var failure)) return failure;
             CropId? crop = null;
-            if (_inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Turnip))) crop = CropId.Turnip;
-            else if (_inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Potato))) crop = CropId.Potato;
+            if (_inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Turnip)).GetAwaiter().GetResult()) crop = CropId.Turnip;
+            else if (_inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Potato)).GetAwaiter().GetResult()) crop = CropId.Potato;
             if (!crop.HasValue) return Fail(ToolResultCode.NoSeed);
             tile.Crop = new CropInstance(crop.Value);
             return Success(FeedbackKind.Plant);
@@ -130,8 +130,8 @@ namespace Prototype.Application
         {
             if (tile.Crop == null || !tile.Crop.IsRipe) return Fail(ToolResultCode.WrongTool);
             string itemId = CropDefinition.ProduceItemId(tile.Crop.Id);
-            if (!_inventory.CanAdd(state.InventorySystem, itemId)) return Fail(ToolResultCode.InventoryFull);
-            _inventory.Add(state.InventorySystem, itemId);
+            if (!_inventory.CanAdd(state.InventorySystem, itemId).GetAwaiter().GetResult()) return Fail(ToolResultCode.InventoryFull);
+            _inventory.Add(state.InventorySystem, itemId).GetAwaiter().GetResult();
             tile.Crop = null;
             return Success(FeedbackKind.Harvest, 1);
         }

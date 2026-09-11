@@ -1,6 +1,6 @@
 namespace Prototype.Application
 {
-    /// <summary>Read DTO for one inventory slot; UI never receives the mutable Domain ItemStack.</summary>
+    /// <summary>Application read data for one inventory slot; UI never receives the mutable Domain ItemStack.</summary>
     public readonly struct InventorySlotData
     {
         public readonly string ItemId;

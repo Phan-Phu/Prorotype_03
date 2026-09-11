@@ -58,7 +58,8 @@ Unity scene / Unity lifecycle
         │
         ▼
 Prototype.Application
-  Inventory/         IInventoryQuery, InventorySnapshot, InventorySlotData
+  Inventory/         IInventoryQuery, InventorySlotData
+  Components/Mapping GenericMapper for raw-to-application projections
   Gameplay/          IGameplayService and action/shop DTOs
   Dialogue/          IDialogueService and DialogueDto
   State/             IClockService, IGameWorldService, state/time DTOs
@@ -92,10 +93,12 @@ Prototype.Domain
 ```
 
 Inventory is intentionally a Domain feature folder. `IInventoryService` is a
-Domain port containing raw sync and UniTask inventory operations; the
-implementation is `Infrastructure/Inventory/InventoryService`. The same
-Infrastructure class implements the UI-facing `Application/Inventory/IInventoryQuery`
-read contract and projects `InventorySnapshot`/`InventorySlotData`.
+Domain port whose operations return UniTask directly (`Add`, `Remove`, `Count`,
+etc.); there are no duplicate `*Async` methods. The implementation is
+`Infrastructure/Inventory/InventoryService`. The same Infrastructure class
+implements the UI-facing `Application/Inventory/IInventoryQuery` read contract
+and uses `Application/Components/Mapping/GenericMapper` to project the raw
+aggregate into `InventorySlotData[]`.
 
 `Presentation` has been merged into `Application`. Feature actions call
 Infrastructure services and consume their DTOs. Domain contains no DTOs. The
@@ -269,7 +272,7 @@ Infrastructure InventoryService
         │
         ├─ GameStateApplicationService → GameStateSnapshotDto
         │                              ├─ GameClockDto → HUD
-        │                              └─ InventorySnapshot / InventorySlotData
+        │                              └─ GenericMapper → InventorySlotData[]
         │                                  → ToolbarCanvasUI
         │
         ├─ IInventoryQuery projection → InventoryScreenUI

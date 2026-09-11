@@ -33,10 +33,10 @@ namespace Prototype.Application
         public readonly int Money;
         public readonly int Stamina;
         public readonly Vector2 PlayerPosition;
-        public readonly InventorySnapshot Inventory;
+        public readonly InventorySlotData[] Inventory;
 
         public GameStateSnapshotDto(GameClockDto clock, int money, int stamina,
-            Vector2 playerPosition, InventorySnapshot inventory)
+            Vector2 playerPosition, InventorySlotData[] inventory)
         {
             Clock = clock; Money = money; Stamina = stamina;
             PlayerPosition = playerPosition; Inventory = inventory;

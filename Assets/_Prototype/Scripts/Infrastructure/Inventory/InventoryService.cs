@@ -4,8 +4,8 @@ using Prototype.Domain;
 namespace Prototype.Application
 {
     /// <summary>
-    /// Infrastructure implementation of the Domain inventory port. DTO projection is exposed
-    /// directly to the Application read contract IInventoryQuery.
+    /// Infrastructure implementation of the Domain inventory port. The Application query is a
+    /// projection through GenericMapper, so callers never receive the mutable Domain aggregate.
     /// </summary>
     public sealed class InventoryService : Prototype.Domain.IInventoryService, Prototype.Application.IInventoryQuery
     {
@@ -16,33 +16,56 @@ namespace Prototype.Application
             _boundInventory = boundInventory;
         }
 
-        InventorySnapshot Prototype.Application.IInventoryQuery.Read()
+        InventorySlotData[] Prototype.Application.IInventoryQuery.Read()
             => Read(_boundInventory);
 
-        UniTask<InventorySnapshot> Prototype.Application.IInventoryQuery.ReadAsync()
+        UniTask<InventorySlotData[]> Prototype.Application.IInventoryQuery.ReadAsync()
             => ReadAsync(_boundInventory);
 
-        public InventorySnapshot Read(Inventory inventory)
-        {
-            if (inventory == null) return new InventorySnapshot(new InventorySlotData[0]);
-            var slots = new InventorySlotData[inventory.Slots.Length];
-            for (int i = 0; i < slots.Length; i++)
+        public InventorySlotData[] Read(Inventory inventory)
+            => GenericMapper.Map(inventory, source =>
             {
-                var stack = inventory.Slots[i];
-                slots[i] = stack == null
-                    ? new InventorySlotData(null, 0)
-                    : new InventorySlotData(stack.ItemId, stack.Count);
-            }
-            return new InventorySnapshot(slots);
-        }
+                if (source == null) return new InventorySlotData[0];
 
-        public UniTask<InventorySnapshot> ReadAsync(Inventory inventory)
+                var slots = new InventorySlotData[source.Slots.Length];
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    var stack = source.Slots[i];
+                    slots[i] = stack == null
+                        ? new InventorySlotData(null, 0)
+                        : new InventorySlotData(stack.ItemId, stack.Count);
+                }
+                return slots;
+            });
+
+        public UniTask<InventorySlotData[]> ReadAsync(Inventory inventory)
             => UniTask.FromResult(Read(inventory));
 
-        public UniTask<bool> AddAsync(Inventory inventory, string itemId, int amount = 1)
-            => UniTask.FromResult(Add(inventory, itemId, amount));
+        public UniTask<bool> Add(Inventory inventory, string itemId, int amount = 1)
+            => UniTask.FromResult(AddInternal(inventory, itemId, amount));
 
-        public bool Add(Inventory inventory, string itemId, int amount = 1)
+        public UniTask<bool> Remove(Inventory inventory, string itemId, int amount = 1)
+            => UniTask.FromResult(RemoveInternal(inventory, itemId, amount));
+
+        public UniTask<bool> CanAdd(Inventory inventory, string itemId)
+            => UniTask.FromResult(CanAddInternal(inventory, itemId));
+
+        public UniTask<int> Count(Inventory inventory, string itemId)
+            => UniTask.FromResult(CountInternal(inventory, itemId));
+
+        public UniTask Clear(Inventory inventory)
+        {
+            ClearInternal(inventory);
+            return UniTask.CompletedTask;
+        }
+
+        public UniTask Swap(Inventory inventory, int firstSlot, int secondSlot)
+        {
+            SwapInternal(inventory, firstSlot, secondSlot);
+            return UniTask.CompletedTask;
+        }
+
+        bool AddInternal(Inventory inventory, string itemId, int amount)
         {
             if (inventory == null || string.IsNullOrEmpty(itemId) || amount <= 0) return false;
             for (int i = 0; i < inventory.Slots.Length; i++)
@@ -66,13 +89,14 @@ namespace Prototype.Application
             return false;
         }
 
-        public bool Remove(Inventory inventory, string itemId, int amount = 1)
+        bool RemoveInternal(Inventory inventory, string itemId, int amount)
         {
             if (inventory == null || string.IsNullOrEmpty(itemId) || amount <= 0) return false;
             for (int i = 0; i < inventory.Slots.Length; i++)
             {
                 var stack = inventory.Slots[i];
-                if (IsLocked(inventory, i) || stack == null || stack.ItemId != itemId || stack.Count < amount) continue;
+                if (IsLocked(inventory, i) || stack == null || stack.ItemId != itemId || stack.Count < amount)
+                    continue;
                 stack.Remove(amount);
                 if (stack.Count <= 0) inventory.Slots[i] = null;
                 return true;
@@ -80,23 +104,18 @@ namespace Prototype.Application
             return false;
         }
 
-        public UniTask<bool> RemoveAsync(Inventory inventory, string itemId, int amount = 1)
-            => UniTask.FromResult(Remove(inventory, itemId, amount));
-
-        public bool CanAdd(Inventory inventory, string itemId)
+        bool CanAddInternal(Inventory inventory, string itemId)
         {
             if (inventory == null || string.IsNullOrEmpty(itemId)) return false;
             for (int i = 0; i < inventory.Slots.Length; i++)
             {
-                if (!IsLocked(inventory, i) && (inventory.Slots[i] == null || inventory.Slots[i].ItemId == itemId)) return true;
+                if (!IsLocked(inventory, i) && (inventory.Slots[i] == null || inventory.Slots[i].ItemId == itemId))
+                    return true;
             }
             return false;
         }
 
-        public UniTask<bool> CanAddAsync(Inventory inventory, string itemId)
-            => UniTask.FromResult(CanAdd(inventory, itemId));
-
-        public int Count(Inventory inventory, string itemId)
+        int CountInternal(Inventory inventory, string itemId)
         {
             if (inventory == null || string.IsNullOrEmpty(itemId)) return 0;
             int total = 0;
@@ -108,36 +127,21 @@ namespace Prototype.Application
             return total;
         }
 
-        public UniTask<int> CountAsync(Inventory inventory, string itemId)
-            => UniTask.FromResult(Count(inventory, itemId));
-
-        public void Clear(Inventory inventory)
+        void ClearInternal(Inventory inventory)
         {
             if (inventory == null) return;
             for (int i = 0; i < inventory.Slots.Length; i++)
                 if (!IsLocked(inventory, i)) inventory.Slots[i] = null;
         }
 
-        public UniTask ClearAsync(Inventory inventory)
-        {
-            Clear(inventory);
-            return UniTask.CompletedTask;
-        }
-
-        public void Swap(Inventory inventory, int firstSlot, int secondSlot)
+        void SwapInternal(Inventory inventory, int firstSlot, int secondSlot)
         {
             if (inventory == null || firstSlot < 0 || secondSlot < 0
                 || firstSlot >= inventory.Slots.Length || secondSlot >= inventory.Slots.Length
                 || firstSlot == secondSlot) return;
             if (IsLocked(inventory, firstSlot) || IsLocked(inventory, secondSlot)) return;
-                (inventory.Slots[firstSlot], inventory.Slots[secondSlot]) =
+            (inventory.Slots[firstSlot], inventory.Slots[secondSlot]) =
                 (inventory.Slots[secondSlot], inventory.Slots[firstSlot]);
-        }
-
-        public UniTask SwapAsync(Inventory inventory, int firstSlot, int secondSlot)
-        {
-            Swap(inventory, firstSlot, secondSlot);
-            return UniTask.CompletedTask;
         }
 
         static bool IsLocked(Inventory inventory, int slot)

@@ -96,17 +96,17 @@ namespace Prototype.Application
             by += 26;
             if (GUI.Button(new Rect(x + 8, by, w - 16, 22), "Force All Ripe")) WorldService?.ForceRipeAll(State);
             by += 26;
-            if (GUI.Button(new Rect(x + 8, by, w - 16, 22), $"+{SeedCheatAmount} Turnip seed") && InventoryService != null) InventoryService.Add(State.InventorySystem, Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Turnip), SeedCheatAmount);
+            if (GUI.Button(new Rect(x + 8, by, w - 16, 22), $"+{SeedCheatAmount} Turnip seed") && InventoryService != null) AddInventory(Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Turnip), SeedCheatAmount);
             by += 26;
-            if (GUI.Button(new Rect(x + 8, by, w - 16, 22), $"+{SeedCheatAmount} Potato seed") && InventoryService != null) InventoryService.Add(State.InventorySystem, Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Potato), SeedCheatAmount);
+            if (GUI.Button(new Rect(x + 8, by, w - 16, 22), $"+{SeedCheatAmount} Potato seed") && InventoryService != null) AddInventory(Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Potato), SeedCheatAmount);
             by += 26;
             if (GUI.Button(new Rect(x + 8, by, w - 16, 22), "Clear inventory") && InventoryService != null)
             {
-                InventoryService.Clear(State.InventorySystem);
-                InventoryService.Add(State.InventorySystem, ToolItemIds.Hoe);
-                InventoryService.Add(State.InventorySystem, ToolItemIds.WateringCan);
-                InventoryService.Add(State.InventorySystem, ToolItemIds.Harvest);
-                InventoryService.Add(State.InventorySystem, ToolItemIds.Axe);
+                ClearInventory();
+                AddInventory(ToolItemIds.Hoe);
+                AddInventory(ToolItemIds.WateringCan);
+                AddInventory(ToolItemIds.Harvest);
+                AddInventory(ToolItemIds.Axe);
             }
             by += 26;
             // S2-DEV-05 (DESIGN_BRIEFS.md [DSN-030]): wood goes into the inventory like any other carried
@@ -121,7 +121,7 @@ namespace Prototype.Application
             }
             by += 26;
             if (GUI.Button(new Rect(x + 8, by, w - 16, 22), "Sell all Wood") && GameplayService != null && InventoryService != null)
-                GameplayService.SellItem(State, TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId));
+                GameplayService.SellItem(State, TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, CountInventory(TreeDefinition.WoodItemId));
             by += 26;
             // S2-QA-05: bug-bash hooks for the wood feature — spawn a tree right next to the player
             // (instead of trekking to the corner GameState.SeedTrees seeds at start) and force every
@@ -144,11 +144,11 @@ namespace Prototype.Application
 
             GUI.Box(new Rect(x + 8, by, w - 16, 78), "");
             GUI.Label(new Rect(x + 14, by + 2, w - 24, 18), "Inventory:");
-            int turnipCount = InventoryService != null ? InventoryService.Count(State.InventorySystem, Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Turnip)) : 0;
-            int potatoCount = InventoryService != null ? InventoryService.Count(State.InventorySystem, Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Potato)) : 0;
-            int turnipProduce = InventoryService != null ? InventoryService.Count(State.InventorySystem, Prototype.Domain.CropDefinition.ProduceItemId(Prototype.Domain.CropId.Turnip)) : 0;
-            int potatoProduce = InventoryService != null ? InventoryService.Count(State.InventorySystem, Prototype.Domain.CropDefinition.ProduceItemId(Prototype.Domain.CropId.Potato)) : 0;
-            int woodCount = InventoryService != null ? InventoryService.Count(State.InventorySystem, Prototype.Domain.TreeDefinition.WoodItemId) : 0;
+            int turnipCount = CountInventory(Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Turnip));
+            int potatoCount = CountInventory(Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Potato));
+            int turnipProduce = CountInventory(Prototype.Domain.CropDefinition.ProduceItemId(Prototype.Domain.CropId.Turnip));
+            int potatoProduce = CountInventory(Prototype.Domain.CropDefinition.ProduceItemId(Prototype.Domain.CropId.Potato));
+            int woodCount = CountInventory(Prototype.Domain.TreeDefinition.WoodItemId);
             GUI.Label(new Rect(x + 14, by + 20, w - 24, 18), $"Turnip seed x{turnipCount}");
             GUI.Label(new Rect(x + 14, by + 38, w - 24, 18),
                 $"Potato seed x{potatoCount}");
@@ -176,7 +176,20 @@ namespace Prototype.Application
         {
             string itemId = CropDefinition.ProduceItemId(crop);
             GameplayService.SellItem(State, itemId, CropDefinition.SellPrice(crop),
-                InventoryService.Count(State.InventorySystem, itemId));
+                CountInventory(itemId));
         }
+
+        void AddInventory(string itemId, int amount = 1)
+        {
+            if (InventoryService != null) InventoryService.Add(State.InventorySystem, itemId, amount).GetAwaiter().GetResult();
+        }
+
+        void ClearInventory()
+        {
+            if (InventoryService != null) InventoryService.Clear(State.InventorySystem).GetAwaiter().GetResult();
+        }
+
+        int CountInventory(string itemId)
+            => InventoryService == null ? 0 : InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult();
     }
 }

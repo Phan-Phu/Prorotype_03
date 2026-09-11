@@ -98,8 +98,7 @@ namespace Prototype.Application
             float dividerH = 1f * scale;
             float rowGap = 10f * scale;
 
-            var snapshot = InventoryQuery?.Read();
-            var slots = snapshot?.Slots;
+            var slots = InventoryQuery?.Read();
             if (slots == null) { PointerOverUI = false; return; }
             bool mouseUpUnhandled = Event.current.type == EventType.MouseUp && Event.current.button == 0;
 
@@ -124,7 +123,8 @@ namespace Prototype.Application
                     }
                     else if (mouseUpUnhandled && slotRect.Contains(mouse) && _dragSlot >= 0)
                     {
-                        InventoryService?.Swap(State.InventorySystem, _dragSlot, slotIndex);
+                        if (InventoryService != null)
+                            InventoryService.Swap(State.InventorySystem, _dragSlot, slotIndex).Forget();
                         _dragSlot = -1;
                         mouseUpUnhandled = false;
                         Event.current.Use();

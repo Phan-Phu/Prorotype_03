@@ -59,15 +59,14 @@ namespace Prototype.Application
         {
             if (Player == null || Player.State == null) return;
             if (_items[0] == null || _highlights[0] == null) return;
-            var snapshot = InventoryQuery != null ? InventoryQuery.Read() : null;
             var inv = Player.State.InventorySystem;
             if (inv == null) return;
-            var snapshotSlots = snapshot?.Slots;
+            var slots = InventoryQuery != null ? InventoryQuery.Read() : null;
             for (int i = 0; i < SlotCount; i++)
             {
-                var hasSnapshot = snapshotSlots != null && i < snapshotSlots.Length;
-                var itemId = hasSnapshot
-                    ? snapshotSlots[i].ItemId
+                var hasSlot = slots != null && i < slots.Length;
+                var itemId = hasSlot
+                    ? slots[i].ItemId
                     : (i < inv.Slots.Length ? inv.Slots[i]?.ItemId : null);
                 _items[i].sprite = string.IsNullOrEmpty(itemId) ? null : PlaceholderArt.ItemIcon(itemId);
                 _items[i].color = string.IsNullOrEmpty(itemId) ? Color.clear : PlaceholderArt.ItemTint(itemId);

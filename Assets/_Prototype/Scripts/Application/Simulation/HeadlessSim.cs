@@ -107,11 +107,11 @@ namespace Prototype.Application
                 // 6. Sell carried produce and wood through the same sell channel a real interaction
                 // uses; harvest itself only adds produce to inventory, it no longer credits Wallet.
                 gameplay.SellItem(state, CropDefinition.ProduceItemId(CropId.Turnip),
-                    CropDefinition.SellPrice(CropId.Turnip), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Turnip)));
+                    CropDefinition.SellPrice(CropId.Turnip), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Turnip)).GetAwaiter().GetResult());
                 gameplay.SellItem(state, CropDefinition.ProduceItemId(CropId.Potato),
-                    CropDefinition.SellPrice(CropId.Potato), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Potato)));
+                    CropDefinition.SellPrice(CropId.Potato), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Potato)).GetAwaiter().GetResult());
                 var woodResult = gameplay.SellItem(state, TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice,
-                    inventory.Count(state.InventorySystem, TreeDefinition.WoodItemId));
+                    inventory.Count(state.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult());
                 int woodIncome = woodResult.Earned;
 
                 int staminaUsed = staminaStart - state.Stamina.Current;

@@ -184,7 +184,9 @@ namespace Prototype.Application
                 var seedId = CropDefinition.SeedItemId(crop);
                 var price = CropDefinition.SeedPrice(crop);
                 _detailTitle.text = $"{Label(crop)} Seed";
-                int owned = InventoryService != null ? InventoryService.Count(State.InventorySystem, seedId) : 0;
+                int owned = InventoryService != null
+                    ? InventoryService.Count(State.InventorySystem, seedId).GetAwaiter().GetResult()
+                    : 0;
                 _detailText.text = $"Plant this seed on prepared soil.\n\nPrice: {price}g\nOwned: {owned}";
                 _priceText.text = $"{price}g   Money: {State.Wallet.Money}";
                 _buyButton.interactable = true;
@@ -215,7 +217,9 @@ namespace Prototype.Application
 
         public ShopSellResult SellWood()
         {
-            int count = InventoryService != null ? InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId) : 0;
+            int count = InventoryService != null
+                ? InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult()
+                : 0;
             return SellItem(TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, count, "Wood");
         }
 
@@ -225,7 +229,9 @@ namespace Prototype.Application
         public ShopSellResult SellCrop(CropId crop)
         {
             string itemId = CropDefinition.ProduceItemId(crop);
-            int count = InventoryService != null ? InventoryService.Count(State.InventorySystem, itemId) : 0;
+            int count = InventoryService != null
+                ? InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult()
+                : 0;
             return SellItem(itemId, CropDefinition.SellPrice(crop), count, Label(crop));
         }
 

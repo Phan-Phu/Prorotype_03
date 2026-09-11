@@ -19,8 +19,9 @@ outside this repository.
 ## Architecture
 
 - `Prototype.Domain`: raw entities, value objects, policies and ports. It has
-  no Unity UI, DTOs, async code or feature/service behavior. Setters are kept
-  for MasterData import/runtime composition only.
+  no Unity UI or application read models. Inventory ports return `UniTask`
+  directly (`Add`, `Remove`, `Count`, etc.); there are no duplicate `*Async`
+  methods. Setters are kept for MasterData import/runtime composition only.
 - `Prototype.Application`: the merged UI/controller layer (Presentation was
   intentionally removed). It receives input, binds scene-authored UI and
   consumes Infrastructure services/DTOs.
@@ -30,8 +31,12 @@ outside this repository.
   `Prototype.Domain`.
 - Inventory is grouped under `Domain/Inventory/`: raw entity, Domain service
   ports and inventory value objects. Its behavior implementation is under
-  `Infrastructure/Inventory/`; the UI query interface and read DTOs are under
-  `Application/Inventory`.
+  `Infrastructure/Inventory/`; the UI query interface and slot read data are
+  under `Application/Inventory`.
+- `Application/Components/Mapping/GenericMapper` is the reusable raw-to-
+  application projection component. Inventory uses it to expose
+  `InventorySlotData[]` without exposing Domain `ItemStack` or introducing a
+  feature-specific snapshot wrapper.
 - Infrastructure exposes UniTask async entry points (`ReadAsync`, `TickAsync`,
   `UseToolAsync`, `BuySeedAsync`, `SellItemAsync`, dialogue and debug async
   methods) so storage/MasterData can become asynchronous later.

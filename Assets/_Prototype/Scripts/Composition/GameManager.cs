@@ -19,6 +19,7 @@ namespace Prototype.Application
         private PlayerController _player;
         private DebugPanel _debug;
         private IGameTimeUseCase _timeUseCase;
+        private IGameStateRepository _stateRepository;
         // Keep Unity coupled to the DI abstraction. The concrete Microsoft provider stays
         // inside this composition root, which makes the rest of the game portable and avoids
         // relying on provider-specific APIs during domain/application execution.
@@ -40,12 +41,14 @@ namespace Prototype.Application
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            // Build state from boot args (AGENT_DEV §4.5 — seed mandatory for reproducible runs).
-            State = new GameState(seed: Prototype.Application.BootArgs.Seed);
+            // Load the aggregate through the Domain repository port. Infrastructure owns the
+            // storage adapter; GameState itself remains a Domain entity.
+            _stateRepository = new InMemoryGameStateRepository();
+            State = _stateRepository.Load(20, 20, Prototype.Application.BootArgs.Seed);
             State.Clock.Day = Mathf.Max(1, Prototype.Application.BootArgs.StartDay);
             State.SetMoney(Prototype.Application.BootArgs.StartMoney);
 
-            ConfigureServices();
+            ConfigureServices(_stateRepository);
 
             SetupCamera();
             SetupWorldView();
@@ -59,9 +62,10 @@ namespace Prototype.Application
             SetupDebug();
         }
 
-        void ConfigureServices()
+        void ConfigureServices(IGameStateRepository stateRepository)
         {
             var services = new ServiceCollection();
+            services.AddSingleton(stateRepository);
             services.AddSingleton<Prototype.Domain.IInventoryReader>(State.InventorySystem);
             // Keep the application boundary explicit: domain state is mapped to DTOs once at the
             // composition root, then views consume the query/use-case interfaces.

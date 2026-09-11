@@ -73,15 +73,22 @@ Prototype.Application
         │ calls directly
         ▼
 Prototype.Domain
-  GameState, GridMap, TileData, CropInstance
-  Inventory, Wallet, Stamina, GameClock
-  ToolController, SeedShop, crop/tree/NPC definitions
+  Entities/      GameState, GridMap, TileData, CropInstance,
+                 Inventory, Wallet, Stamina, GameClock, NPC state
+  ValueObjects/  GridCoord, ItemStack, tool result/value types
+  Services/      ToolController, SeedShop
+  Policies/      BalanceConfig, crop/tree definitions
+  Ports/         IGameStateRepository, IInventoryReader
         │
         ▼
 Prototype.Application adapters
-  InventoryQuery / DTOs
+  InventoryQuery / DTOs / use cases
   ArtCatalog / PlaceholderArt
   SessionLogger
+
+Prototype.Infrastructure implementations
+  InMemoryGameStateRepository
+  Unity art and telemetry adapters
 ```
 
 `Presentation` has been merged into `Application`. All runtime and UI code now
@@ -122,6 +129,10 @@ builds the Microsoft DI service provider, then wires the MonoBehaviours. The
 shared time/read boundary is `GameStateApplicationService`; feature-specific
 controllers still call the domain action methods directly until those use
 cases need their own application services.
+
+Infrastructure does not duplicate Domain entity logic. It implements Domain
+ports such as `IGameStateRepository`; the in-memory adapter currently creates
+and holds the aggregate, while a file/cloud adapter can replace it later.
 
 Important bootstrap behavior:
 

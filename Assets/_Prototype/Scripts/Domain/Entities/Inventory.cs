@@ -1,8 +1,5 @@
 namespace Prototype.Domain
 {
-    /// <summary>One item stack occupying a single inventory slot.</summary>
-    public class ItemStack { public string ItemId; public int Count; public ItemStack(string id, int n = 1) { ItemId = id; Count = n; } }
-
     /// <summary>
     /// Fixed-slot inventory (AGENT_DEV §3.2). SlotCount=40 matches the InventoryPlayer.png art exactly:
     /// a 10-slot hotbar row + a 3x10 backpack grid below it. Slots are positional (Slots[i] can be
@@ -35,7 +32,7 @@ namespace Prototype.Domain
         public bool Add(string itemId, int n = 1)
         {
             for (int i = 0; i < SlotCount; i++)
-                if (Slots[i] != null && Slots[i].ItemId == itemId) { Slots[i].Count += n; return true; }
+                if (Slots[i] != null && Slots[i].ItemId == itemId) { Slots[i].Add(n); return true; }
             for (int i = 0; i < SlotCount; i++)
                 if (Slots[i] == null) { Slots[i] = new ItemStack(itemId, n); return true; }
             return false;
@@ -54,7 +51,7 @@ namespace Prototype.Domain
             for (int i = 0; i < SlotCount; i++)
             {
                 if (Slots[i] == null || Slots[i].ItemId != itemId || Slots[i].Count < n) continue;
-                Slots[i].Count -= n;
+                Slots[i].Remove(n);
                 if (Slots[i].Count <= 0) Slots[i] = null;
                 return true;
             }

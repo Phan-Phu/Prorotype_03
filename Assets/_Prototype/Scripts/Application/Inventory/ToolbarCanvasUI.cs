@@ -10,7 +10,7 @@ namespace Prototype.Application
     public sealed class ToolbarCanvasUI : MonoBehaviour
     {
         public PlayerController Player;
-        public IInventoryQuery InventoryQuery;
+        public InventoryService InventoryService;
         public static bool PointerOverUI { get; private set; }
         const int SlotCount = 12;
         readonly Image[] _items = new Image[SlotCount];
@@ -61,7 +61,7 @@ namespace Prototype.Application
             if (_items[0] == null || _highlights[0] == null) return;
             var inv = Player.State.InventorySystem;
             if (inv == null) return;
-            var slots = InventoryQuery != null ? InventoryQuery.Read() : null;
+            var slots = InventoryService != null ? InventoryService.Read(inv) : null;
             for (int i = 0; i < SlotCount; i++)
             {
                 var hasSlot = slots != null && i < slots.Length;

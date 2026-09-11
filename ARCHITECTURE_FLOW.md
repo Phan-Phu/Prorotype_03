@@ -58,7 +58,8 @@ Unity scene / Unity lifecycle
         │
         ▼
 Prototype.Application
-  Inventory/         IInventoryQuery, InventorySlotData
+  Inventory/         InventoryService bindings, InventorySlotData,
+                     ToolbarCanvasUI, InventoryScreenUI
   Components/Mapping GenericMapper for raw-to-application projections
   Gameplay/          IGameplayService and action/shop DTOs
   Dialogue/          IDialogueService and DialogueDto
@@ -67,8 +68,6 @@ Prototype.Application
   PlayerController     input, movement, active-slot actions
   WorldView            world rendering
   HUD                 HUD rendering
-  ToolbarCanvasUI      scene-authored toolbar binding
-  InventoryScreenUI    inventory presentation
   SeedShopUI           UGUI shop and shop actions
   NpcDialogueController NPC interaction and dialogue presentation
   DebugPanel           debug-only controls
@@ -96,9 +95,10 @@ Inventory is intentionally a Domain feature folder. `IInventoryService` is a
 Domain port whose operations return UniTask directly (`Add`, `Remove`, `Count`,
 etc.); there are no duplicate `*Async` methods. The implementation is
 `Infrastructure/Inventory/InventoryService`. The same Infrastructure class
-implements the UI-facing `Application/Inventory/IInventoryQuery` read contract
-and uses `Application/Components/Mapping/GenericMapper` to project the raw
-aggregate into `InventorySlotData[]`.
+exposes destination-typed projections through its generic mapper usage and
+returns `InventorySlotData[]` directly to the inventory UI. There is no
+Application inventory-query interface: the composition root injects the
+concrete Infrastructure service where a projection is needed.
 
 `Presentation` has been merged into `Application`. Feature actions call
 Infrastructure services and consume their DTOs. Domain contains no DTOs. The
@@ -148,7 +148,7 @@ Important bootstrap behavior:
 
 - `Prototype_Main.unity` contains the main camera and authored UI canvas roots.
 - `ToolbarCanvasUI` is found in the scene and bound to `Player` and
-  `IInventoryQuery`; the toolbar is not created by `GameManager`.
+  concrete `InventoryService`; the toolbar is not created by `GameManager`.
 - `GameStateApplicationService` maps mutable domain state into
   `GameStateSnapshotDto`. HUD time rendering consumes `IGameStateQuery` and
   does not read `GameClock` or create fallback IMGUI controls.
@@ -275,16 +275,17 @@ Infrastructure InventoryService
         │                              └─ GenericMapper → InventorySlotData[]
         │                                  → ToolbarCanvasUI
         │
-        ├─ IInventoryQuery projection → InventoryScreenUI
+        ├─ GenericMapper → InventorySlotData[] → InventoryScreenUI / ToolbarCanvasUI
         │
         └─ active slot → PlayerController action resolution
 ```
 
 The toolbar background, slot objects, anchors and responsive canvas are
 scene-authored. Runtime code updates item images, counts and selection state.
-`InventoryService` implements the Application `IInventoryQuery` projection and
-the Domain `IInventoryService` port. DI registers the same instance for both;
-the Domain inventory remains the source of truth.
+`InventoryService` implements the Domain `IInventoryService` port and exposes
+the concrete read projection used by the Application inventory UI. DI registers
+the same instance for both the concrete Infrastructure service and the Domain
+port; the Domain inventory remains the source of truth.
 
 ## 7. NPC dialogue flow
 

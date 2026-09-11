@@ -7,7 +7,7 @@ namespace Prototype.Application
     /// Infrastructure implementation of the Domain inventory port. The Application query is a
     /// projection through GenericMapper, so callers never receive the mutable Domain aggregate.
     /// </summary>
-    public sealed class InventoryService : Prototype.Domain.IInventoryService, Prototype.Application.IInventoryQuery
+    public sealed class InventoryService : Prototype.Domain.IInventoryService
     {
         readonly Inventory _boundInventory;
 
@@ -15,12 +15,6 @@ namespace Prototype.Application
         {
             _boundInventory = boundInventory;
         }
-
-        InventorySlotData[] Prototype.Application.IInventoryQuery.Read()
-            => Read(_boundInventory);
-
-        UniTask<InventorySlotData[]> Prototype.Application.IInventoryQuery.ReadAsync()
-            => ReadAsync(_boundInventory);
 
         public InventorySlotData[] Read(Inventory inventory)
             => GenericMapper.Map(inventory, source =>

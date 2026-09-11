@@ -67,8 +67,8 @@ namespace Prototype.Application
         {
             var services = new ServiceCollection();
             services.AddSingleton(stateRepository);
-            // Keep the application boundary explicit: domain state is mapped to DTOs once at the
-            // composition root, then views consume the query/use-case interfaces.
+            // Keep the application boundary explicit: raw inventory is projected by the
+            // Infrastructure mapper when a view needs its destination type.
             var inventoryService = new InventoryService(State.InventorySystem);
             var clockService = new ClockService();
             var gameplayService = new GameplayService(inventoryService);
@@ -76,12 +76,12 @@ namespace Prototype.Application
             var worldService = new GameWorldService();
             _worldService = worldService;
             var stateService = new GameStateApplicationService(State, inventoryService, clockService);
+            services.AddSingleton<InventoryService>(inventoryService);
             services.AddSingleton<Prototype.Domain.IInventoryService>(inventoryService);
             services.AddSingleton<IClockService>(clockService);
             services.AddSingleton<IGameplayService>(gameplayService);
             services.AddSingleton<IDialogueService>(dialogueService);
             services.AddSingleton<IGameWorldService>(worldService);
-            services.AddSingleton<IInventoryQuery>(inventoryService);
             services.AddSingleton<IGameStateQuery>(stateService);
             services.AddSingleton<IGameTimeUseCase>(stateService);
             _services = services.BuildServiceProvider(new ServiceProviderOptions
@@ -225,7 +225,7 @@ namespace Prototype.Application
             if (bar != null)
             {
                 bar.Player = _player;
-                bar.InventoryQuery = _services.GetRequiredService<IInventoryQuery>();
+                bar.InventoryService = _services.GetRequiredService<InventoryService>();
             }
         }
 
@@ -239,7 +239,7 @@ namespace Prototype.Application
             }
             inv.State = State;
             inv.InventoryService = _services.GetRequiredService<Prototype.Domain.IInventoryService>();
-            inv.InventoryQuery = _services.GetRequiredService<IInventoryQuery>();
+            inv.InventoryReadService = _services.GetRequiredService<InventoryService>();
             inv.Player = _player;
         }
 

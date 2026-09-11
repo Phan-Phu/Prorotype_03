@@ -9,13 +9,13 @@ namespace Prototype.Application
     public sealed class GameStateApplicationService : IGameStateQuery, IGameTimeUseCase
     {
         readonly GameState _state;
-        readonly IInventoryQuery _inventoryQuery;
+        readonly InventoryService _inventoryService;
         readonly IClockService _clockService;
 
-        public GameStateApplicationService(GameState state, IInventoryQuery inventoryQuery, IClockService clockService)
+        public GameStateApplicationService(GameState state, InventoryService inventoryService, IClockService clockService)
         {
             _state = state;
-            _inventoryQuery = inventoryQuery;
+            _inventoryService = inventoryService;
             _clockService = clockService;
         }
 
@@ -33,6 +33,6 @@ namespace Prototype.Application
                 _state.Wallet.Money,
                 _state.Stamina.Current,
                 _state.PlayerPosition,
-                _inventoryQuery.Read());
+                _inventoryService.Read(_state.InventorySystem));
     }
 }

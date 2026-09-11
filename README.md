@@ -36,7 +36,9 @@ outside this repository.
 - `Application/Components/Mapping/GenericMapper` is the reusable raw-to-
   application projection component. Inventory uses it to expose
   `InventorySlotData[]` without exposing Domain `ItemStack` or introducing a
-  feature-specific snapshot wrapper.
+  feature-specific snapshot wrapper. The inventory UI consumes the concrete
+  Infrastructure service directly; there is no redundant `IInventoryQuery`
+  interface.
 - Infrastructure exposes UniTask async entry points (`ReadAsync`, `TickAsync`,
   `UseToolAsync`, `BuySeedAsync`, `SellItemAsync`, dialogue and debug async
   methods) so storage/MasterData can become asynchronous later.

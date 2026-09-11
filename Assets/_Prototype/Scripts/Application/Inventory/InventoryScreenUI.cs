@@ -13,7 +13,7 @@ namespace Prototype.Application
     {
         public GameState State;
         public IInventoryService InventoryService;
-        public IInventoryQuery InventoryQuery;
+        public InventoryService InventoryReadService;
         public PlayerController Player;
         private bool _open;
         private int _dragSlot = -1;
@@ -98,7 +98,7 @@ namespace Prototype.Application
             float dividerH = 1f * scale;
             float rowGap = 10f * scale;
 
-            var slots = InventoryQuery?.Read();
+            var slots = InventoryReadService?.Read(State.InventorySystem);
             if (slots == null) { PointerOverUI = false; return; }
             bool mouseUpUnhandled = Event.current.type == EventType.MouseUp && Event.current.button == 0;
 
@@ -124,7 +124,7 @@ namespace Prototype.Application
                     else if (mouseUpUnhandled && slotRect.Contains(mouse) && _dragSlot >= 0)
                     {
                         if (InventoryService != null)
-                            InventoryService.Swap(State.InventorySystem, _dragSlot, slotIndex).Forget();
+                            InventoryService.Swap(State.InventorySystem, _dragSlot, slotIndex).GetAwaiter().GetResult();
                         _dragSlot = -1;
                         mouseUpUnhandled = false;
                         Event.current.Use();

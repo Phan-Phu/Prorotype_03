@@ -124,7 +124,8 @@ namespace Prototype.Application
             _facing = ResolveFourWayFacing(rawDirection);
             _spriteDir = SpriteDirFromFacing(_facing);
 
-            MoveWithCollision(dir * Prototype.Domain.BalanceConfig.MoveSpeed * deltaSeconds);
+            float moveSpeed = State.MasterData?.Player?.MoveSpeed ?? Prototype.Domain.BalanceConfig.MoveSpeed;
+            MoveWithCollision(dir * moveSpeed * deltaSeconds);
             return true;
         }
 

@@ -78,7 +78,7 @@ namespace Prototype.Application
         {
             var stages = Art?.CropStages;
             if (stages == null || stages.Length != 5) return null;
-            int growthDays = Prototype.Domain.CropDefinition.GrowthDays(crop.Id);
+            int growthDays = crop.GrowthDays;
             int stage = Mathf.Clamp(Mathf.RoundToInt(crop.DaysGrown / (float)growthDays * 4f), 0, 4);
             return stages[stage];
         }

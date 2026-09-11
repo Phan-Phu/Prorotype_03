@@ -34,7 +34,8 @@ namespace Prototype.Domain
             HP = hp;
         }
 
-        public static TileObject NewTree() => new TileObject(TileObjectType.Tree, TreeDefinition.MaxHP);
+        public static TileObject NewTree(int maxHP = -1)
+            => new TileObject(TileObjectType.Tree, maxHP > 0 ? maxHP : TreeDefinition.MaxHP);
 
         public bool IsAlive => HP > 0;
 

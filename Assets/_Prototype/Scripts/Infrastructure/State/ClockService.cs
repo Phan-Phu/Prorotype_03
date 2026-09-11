@@ -25,7 +25,7 @@ namespace Prototype.Infrastructure
                 return ResultFactory.UniTaskFailure<ClockFailure, GameClockDto>(ClockFailure.InvalidDelta(deltaSeconds));
             return Safe("clock.tick", () =>
             {
-                int hourMs = (int)(BalanceConfig.SecondsPerInGameHour * 1000f);
+                int hourMs = (int)(state.MasterData.Time.SecondsPerInGameHour * 1000f);
                 state.Clock.AccumulatedMilliseconds += (int)(deltaSeconds * 1000f);
                 while (state.Clock.AccumulatedMilliseconds >= hourMs)
                 {
@@ -66,7 +66,7 @@ namespace Prototype.Infrastructure
         static void AdvanceHour(GameState state)
         {
             state.Clock.Hour++;
-            if (state.Clock.Hour >= BalanceConfig.DayEndHour) EndDay(state);
+            if (state.Clock.Hour >= state.MasterData.Time.DayEndHour) EndDay(state);
         }
 
         static void EndDay(GameState state)
@@ -87,7 +87,7 @@ namespace Prototype.Infrastructure
             }
             state.Stamina.Current = state.Stamina.Max;
             state.Clock.Day++;
-            state.Clock.Hour = BalanceConfig.DayStartHour;
+            state.Clock.Hour = state.MasterData.Time.DayStartHour;
             state.Clock.AccumulatedMilliseconds = 0;
         }
 

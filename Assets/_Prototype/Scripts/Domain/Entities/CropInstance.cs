@@ -8,9 +8,14 @@ namespace Prototype.Domain
     {
         public CropId Id;
         public int DaysGrown;
+        public readonly int GrowthDays;
         public bool WateredToday;
 
-        public CropInstance(CropId id) { Id = id; }
+        public CropInstance(CropId id, int growthDays = -1)
+        {
+            Id = id;
+            GrowthDays = growthDays > 0 ? growthDays : CropDefinition.GrowthDays(id);
+        }
 
         public void AdvanceDay()
         {
@@ -18,6 +23,6 @@ namespace Prototype.Domain
             WateredToday = false;
         }
 
-        public bool IsRipe => DaysGrown >= CropDefinition.GrowthDays(Id);
+        public bool IsRipe => DaysGrown >= GrowthDays;
     }
 }

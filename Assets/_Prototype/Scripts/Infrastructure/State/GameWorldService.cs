@@ -48,7 +48,7 @@ namespace Prototype.Infrastructure
             {
                 var tile = state.Grid.GetTile(coord);
                 if (tile == null || tile.Type != TileType.Grass || tile.Object != null) return false;
-                tile.Object = TileObject.NewTree();
+                tile.Object = TileObject.NewTree(state.MasterData.Tree.MaxHP);
                 return true;
             });
         }
@@ -62,7 +62,7 @@ namespace Prototype.Infrastructure
                 foreach (var tile in state.Grid.AllTiles())
                     if (tile.Object != null && !tile.Object.IsAlive)
                     {
-                        tile.Object.HP = TreeDefinition.MaxHP;
+                        tile.Object.HP = state.MasterData.Tree.MaxHP;
                         tile.Object.RespawnDaysLeft = 0;
                     }
             });
@@ -75,7 +75,11 @@ namespace Prototype.Infrastructure
             return Safe("world.ripe_all", () =>
             {
                 foreach (var tile in state.Grid.AllTiles())
-                    if (tile.Crop != null) tile.Crop.DaysGrown = CropDefinition.GrowthDays(tile.Crop.Id);
+                    if (tile.Crop != null)
+                    {
+                        var crop = state.MasterData.GetCrop(tile.Crop.Id);
+                        if (crop != null) tile.Crop.DaysGrown = crop.GrowthDays;
+                    }
             });
         }
 

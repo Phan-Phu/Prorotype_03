@@ -47,8 +47,11 @@ namespace Prototype.Infrastructure
                 if (state == null)
                     return ResultFactory.Failure<GameplayFailure, ShopPurchaseDto>(GameplayFailure.NotInitialized("game_state"));
 
-                string itemId = CropDefinition.SeedItemId(crop);
-                int price = CropDefinition.SeedPrice(crop);
+                var cropData = state.MasterData.GetCrop(crop);
+                if (cropData == null)
+                    return ResultFactory.Failure<GameplayFailure, ShopPurchaseDto>(GameplayFailure.InvalidArgument(crop.ToString()));
+                string itemId = cropData.SeedItemId;
+                int price = cropData.SeedPrice;
                 int moneyBefore = state.Wallet.Money;
                 var countBefore = _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult();
                 if (!countBefore.IsSuccess) return Propagate<ShopPurchaseDto>(countBefore, itemId);
@@ -120,9 +123,11 @@ namespace Prototype.Infrastructure
             if (state == null || !state.Grid.InBounds(coord)) return Fail(ToolResultCode.InvalidTile);
             var tile = state.Grid.GetTile(coord);
             if (!CanPlant(tile, out var failure)) return failure;
-            var remove = _inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(crop)).GetAwaiter().GetResult();
+            var cropData = state.MasterData.GetCrop(crop);
+            if (cropData == null) return Fail(ToolResultCode.SystemError);
+            var remove = _inventory.Remove(state.InventorySystem, cropData.SeedItemId).GetAwaiter().GetResult();
             if (!remove.IsSuccess) return Fail(MapInventoryFailure(remove.Failure.Code, ToolResultCode.NoSeed));
-            tile.Crop = new CropInstance(crop);
+            tile.Crop = new CropInstance(crop, cropData.GrowthDays);
             return Success(FeedbackKind.Plant);
         }
 
@@ -130,7 +135,7 @@ namespace Prototype.Infrastructure
         {
             if (tile.Object != null) return Fail(ToolResultCode.Blocked);
             if (tile.Type != TileType.Grass) return Fail(ToolResultCode.WrongTool);
-            if (!Spend(state, BalanceConfig.TillStaminaCost)) return Fail(ToolResultCode.NoStamina);
+            if (!Spend(state, state.MasterData.Tools.TillStaminaCost)) return Fail(ToolResultCode.NoStamina);
             tile.Type = TileType.Tilled;
             return Success(FeedbackKind.Till);
         }
@@ -139,36 +144,41 @@ namespace Prototype.Infrastructure
         {
             if (tile.Object == null || tile.Object.Type != TileObjectType.Tree || !tile.Object.IsAlive)
                 return Fail(ToolResultCode.NotChoppable);
-            if (!Spend(state, BalanceConfig.ChopStaminaCost)) return Fail(ToolResultCode.NoStamina);
+            if (!Spend(state, state.MasterData.Tree.ChopStaminaCost)) return Fail(ToolResultCode.NoStamina);
             if (tile.Object.HP <= 1)
             {
-                var canAdd = _inventory.CanAdd(state.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult();
+                var canAdd = _inventory.CanAdd(state.InventorySystem, state.MasterData.Tree.WoodItemId).GetAwaiter().GetResult();
                 if (!canAdd.IsSuccess) return Fail(MapInventoryFailure(canAdd.Failure.Code, ToolResultCode.InventoryFull));
             }
 
             tile.Object.HP--;
             if (tile.Object.HP > 0) return Success(FeedbackKind.Chop);
-            tile.Object.RespawnDaysLeft = TreeDefinition.RespawnDays;
-            var add = _inventory.Add(state.InventorySystem, TreeDefinition.WoodItemId, TreeDefinition.WoodPerTree).GetAwaiter().GetResult();
+            tile.Object.RespawnDaysLeft = state.MasterData.Tree.RespawnDays;
+            var add = _inventory.Add(state.InventorySystem, state.MasterData.Tree.WoodItemId, state.MasterData.Tree.WoodPerTree).GetAwaiter().GetResult();
             if (!add.IsSuccess) return Fail(MapInventoryFailure(add.Failure.Code, ToolResultCode.SystemError));
-            return Success(FeedbackKind.Chop, TreeDefinition.WoodPerTree);
+            return Success(FeedbackKind.Chop, state.MasterData.Tree.WoodPerTree);
         }
 
         ToolActionDto Plant(GameState state, TileData tile)
         {
             if (!CanPlant(tile, out var failure)) return failure;
             CropId? crop = null;
-            var turnip = _inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Turnip)).GetAwaiter().GetResult();
+            var turnipData = state.MasterData.GetCrop(CropId.Turnip);
+            var potatoData = state.MasterData.GetCrop(CropId.Potato);
+            if (turnipData == null || potatoData == null) return Fail(ToolResultCode.SystemError);
+            var turnip = _inventory.Remove(state.InventorySystem, turnipData.SeedItemId).GetAwaiter().GetResult();
             if (turnip.IsSuccess) crop = CropId.Turnip;
             else
             {
-                var potato = _inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Potato)).GetAwaiter().GetResult();
+                var potato = _inventory.Remove(state.InventorySystem, potatoData.SeedItemId).GetAwaiter().GetResult();
                 if (potato.IsSuccess) crop = CropId.Potato;
                 else if (turnip.Failure.Code == FailureCode.SystemError || potato.Failure.Code == FailureCode.SystemError)
                     return Fail(ToolResultCode.SystemError);
             }
             if (!crop.HasValue) return Fail(ToolResultCode.NoSeed);
-            tile.Crop = new CropInstance(crop.Value);
+            var selectedCrop = state.MasterData.GetCrop(crop.Value);
+            if (selectedCrop == null) return Fail(ToolResultCode.SystemError);
+            tile.Crop = new CropInstance(crop.Value, selectedCrop.GrowthDays);
             return Success(FeedbackKind.Plant);
         }
 
@@ -176,7 +186,7 @@ namespace Prototype.Infrastructure
         {
             if (tile.Type != TileType.Tilled) return Fail(ToolResultCode.WrongTool);
             if (tile.IsWatered) return Success(FeedbackKind.Water);
-            if (!Spend(state, BalanceConfig.WaterStaminaCost)) return Fail(ToolResultCode.NoStamina);
+            if (!Spend(state, state.MasterData.Tools.WaterStaminaCost)) return Fail(ToolResultCode.NoStamina);
             tile.IsWatered = true;
             if (tile.Crop != null) tile.Crop.WateredToday = true;
             return Success(FeedbackKind.Water);
@@ -185,7 +195,9 @@ namespace Prototype.Infrastructure
         ToolActionDto Harvest(GameState state, TileData tile)
         {
             if (tile.Crop == null || !tile.Crop.IsRipe) return Fail(ToolResultCode.WrongTool);
-            string itemId = CropDefinition.ProduceItemId(tile.Crop.Id);
+            var cropData = state.MasterData.GetCrop(tile.Crop.Id);
+            if (cropData == null) return Fail(ToolResultCode.SystemError);
+            string itemId = cropData.ProduceItemId;
             var canAdd = _inventory.CanAdd(state.InventorySystem, itemId).GetAwaiter().GetResult();
             if (!canAdd.IsSuccess) return Fail(MapInventoryFailure(canAdd.Failure.Code, ToolResultCode.InventoryFull));
             var add = _inventory.Add(state.InventorySystem, itemId).GetAwaiter().GetResult();

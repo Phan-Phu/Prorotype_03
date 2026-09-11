@@ -18,7 +18,10 @@ flowchart LR
     end
 
     Bootstrap[GameManager\ncomposition root] --> DI[Microsoft DI]
+    Bootstrap --> MD[MasterDataImporter\nResources/MasterData.asset]
+    MD --> Snapshot[Domain MasterDataSnapshot]
     DI --> Infra[Infrastructure services\nUniTask + typed Result + mapping]
+    Snapshot --> Infra
     Infra --> State[Domain raw state]
 
     Input --> Player[PlayerController]
@@ -77,6 +80,7 @@ Prototype.Application
 Prototype.Infrastructure
   InventoryService / UniTask + typed Result implementations
   ClockService / GameplayService / DialogueService
+  MasterDataAsset / MasterDataImporter / validation + mapping
   GameStateApplicationService / repository adapters
   ArtCatalog / PlaceholderArt / SessionLogger
         │
@@ -110,6 +114,14 @@ world renderer still receives the raw runtime aggregate through the composition
 root for map/collision/sprite queries; new state mutation must go through
 Infrastructure. There is no `Farm.Prototype.*` namespace in the current source.
 
+Master Data is the content boundary. `MasterDataAsset` is the Unity-authored
+source in Infrastructure; `MasterDataImporter` validates it and maps it to the
+immutable `Prototype.Domain.MasterDataSnapshot`. `GameManager` imports the
+snapshot before calling `IGameStateRepository.Load(...)`. The Domain aggregate
+receives only that snapshot and never reads `Resources`, `ScriptableObject` or
+`AssetDatabase`. Infrastructure services then use the snapshot for gameplay
+rules, while Application uses the resulting state/DTOs for UI.
+
 The physical folders under `Assets/_Prototype/Scripts/Application/` are only
 for navigation (`UI`, `Player`, `NPC`, `World`, `Debug`, etc.). They are not
 separate architectural layers.
@@ -128,7 +140,9 @@ sequenceDiagram
     U->>G: AfterSceneLoad bootstrap
     G->>D: register Infrastructure services
     D->>I: Inventory / Clock / Gameplay / Dialogue services
-    I->>S: create/read raw state
+    G->>I: MasterDataImporter.Load()
+    I->>I: validate MasterData.asset and map to MasterDataSnapshot
+    I->>S: create raw state with imported snapshot
     G->>C: find or create camera/world/player/HUD/UI/NPC/debug
     G->>C: assign State, DTO query and Player references
     loop every frame
@@ -151,6 +165,9 @@ created in Infrastructure, never in Domain.
 Important bootstrap behavior:
 
 - `Prototype_Main.unity` contains the main camera and authored UI canvas roots.
+- `MasterData.asset` is loaded and validated before `GameState` is constructed;
+  an invalid asset returns a typed `MasterDataFailure` and prevents a partially
+  configured session from starting.
 - `ToolbarCanvasUI` is found in the scene and bound to `Player` and
   concrete `InventoryService`; the toolbar is not created by `GameManager`.
 - `GameStateApplicationService` maps mutable domain state into

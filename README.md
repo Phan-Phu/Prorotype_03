@@ -29,6 +29,12 @@ outside this repository.
   own inventory, clock, farming/economy, dialogue and world/debug behavior.
   Their namespace is `Prototype.Infrastructure`; Application only consumes
   their contracts and typed results.
+- Runtime balance and content are authored in
+  `Assets/_Prototype/Resources/MasterData.asset`. `MasterDataImporter` validates
+  that asset and converts it to the immutable Domain `MasterDataSnapshot` before
+  `GameState` is created. Player/time/tool costs, crops, trees, starting items
+  and NPC dialogue therefore have one editable source instead of parallel
+  hard-coded values.
 - Inventory is grouped under `Domain/Inventory/`: raw entity, Domain service
   ports and inventory value objects. Its behavior implementation is under
   `Infrastructure/Inventory/`; the UI query interface and slot read data are
@@ -95,3 +101,18 @@ For a headless compile check:
 - Keep generated output and test/agent/design material outside the repository.
 - Compile with Unity CLI before pushing.
 - Each code change should be committed with a focused message.
+
+## Master Data workflow
+
+1. Select `Prototype/Master Data/Create or Reset Prototype Asset` in the Unity
+   editor when the prototype defaults need to be restored.
+2. Edit `Assets/_Prototype/Resources/MasterData.asset` in the Inspector.
+3. On startup, `GameManager` calls `MasterDataImporter.Load()` and stops with a
+   typed failure if the asset is missing or invalid.
+4. Infrastructure passes the imported snapshot into `GameState`; gameplay and
+   UI services read prices, growth days, stamina costs, NPC data and clock rules
+   from that snapshot.
+
+The asset is the content source; `BalanceConfig` and static definitions remain
+fallback defaults for headless/unit construction only. They are not consulted
+by a normal scene boot after a valid Master Data asset is present.

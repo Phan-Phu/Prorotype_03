@@ -22,6 +22,8 @@ namespace Prototype.Application
         private Text _dialogueText;
         private Text _advanceText;
 
+        NpcDefinition[] Npcs => State?.MasterData?.Npcs ?? NpcDefinitions.All;
+
         public bool IsDialogueOpen => ReadDialogue()?.IsOpen == true;
 
         void Awake()
@@ -46,7 +48,7 @@ namespace Prototype.Application
         {
             if (State == null) return;
             var root = new GameObject("NPCs");
-            foreach (var npc in NpcDefinitions.All)
+            foreach (var npc in Npcs)
                 SpawnNpc(root.transform, npc);
         }
 
@@ -107,8 +109,9 @@ namespace Prototype.Application
         {
             Vector3 playerPos = Player.transform.position;
             NpcDefinition best = null;
-            float bestSq = NpcDefinitions.InteractionRadiusTiles * NpcDefinitions.InteractionRadiusTiles;
-            foreach (var npc in NpcDefinitions.All)
+            float radius = State?.MasterData?.NpcInteractionRadiusTiles ?? NpcDefinitions.InteractionRadiusTiles;
+            float bestSq = radius * radius;
+            foreach (var npc in Npcs)
             {
                 float sq = (npc.WorldPosition(State.Grid) - playerPos).sqrMagnitude;
                 if (sq <= bestSq)

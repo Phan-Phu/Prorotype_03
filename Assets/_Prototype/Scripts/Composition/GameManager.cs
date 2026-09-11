@@ -16,6 +16,7 @@ namespace Prototype.Application
     {
         public static GameManager Instance { get; private set; }
         public GameState State { get; private set; }
+        public MasterDataSnapshot MasterData { get; private set; }
 
         private PlayerController _player;
         private DebugPanel _debug;
@@ -45,8 +46,16 @@ namespace Prototype.Application
 
             // Load the aggregate through the Domain repository port. Infrastructure owns the
             // storage adapter; GameState itself remains a Domain entity.
+            var masterDataResult = MasterDataImporter.Load().GetAwaiter().GetResult();
+            if (!masterDataResult.IsSuccess)
+            {
+                Debug.LogError($"Could not import Master Data: {masterDataResult.Failure.Message} ({masterDataResult.Failure.Context})");
+                return;
+            }
+            MasterData = masterDataResult.Value;
             _stateRepository = new InMemoryGameStateRepository();
-            var load = _stateRepository.Load(20, 20, Prototype.Application.BootArgs.Seed).GetAwaiter().GetResult();
+            var load = _stateRepository.Load(20, 20, Prototype.Application.BootArgs.Seed, MasterData)
+                .GetAwaiter().GetResult();
             if (!load.IsSuccess)
             {
                 Debug.LogError($"Could not load game state: {load.Failure.Message}");
@@ -255,7 +264,10 @@ namespace Prototype.Application
             var sign = GameObject.Find("SeedShopSign");
             if (sign == null) sign = new GameObject("SeedShopSign");
             var sr = sign.GetComponent<SpriteRenderer>() ?? sign.AddComponent<SpriteRenderer>();
-            string turnipSeed = Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Turnip);
+            var turnipData = State.MasterData.GetCrop(Prototype.Domain.CropId.Turnip);
+            string turnipSeed = turnipData != null
+                ? turnipData.SeedItemId
+                : Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Turnip);
             sr.sprite = PlaceholderArt.ItemIcon(turnipSeed) ?? PlaceholderArt.WhiteSprite;
             sr.color = PlaceholderArt.ItemIcon(turnipSeed) != null
                 ? PlaceholderArt.ItemTint(turnipSeed)

@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f903dced5733c14384368596a574110, type: 3}
+  m_Name: MasterData
+  m_EditorClassIdentifier: Prototype.Infrastructure::Prototype.Infrastructure.MasterDataAsset
+  MoveSpeed: 4
+  MaxStamina: 100
+  StartMoney: 500
+  SecondsPerInGameHour: 40
+  DayStartHour: 6
+  DayEndHour: 26
+  TillStaminaCost: 2
+  WaterStaminaCost: 1
+  HarvestStaminaCost: 0
+  ChopStaminaCost: 4
+  Crops:
+  - CropId: Turnip
+    SeedItemId: turnip_seed
+    ProduceItemId: turnip
+    SeedPrice: 20
+    SellPrice: 60
+    GrowthDays: 4
+  - CropId: Potato
+    SeedItemId: potato_seed
+    ProduceItemId: potato
+    SeedPrice: 50
+    SellPrice: 160
+    GrowthDays: 6
+  Tree:
+    MaxHP: 3
+    ChopStaminaCost: 4
+    WoodPerTree: 5
+    WoodSellPrice: 8
+    RespawnDays: 4
+    InitialCount: 8
+    WoodItemId: wood
+  StartingItems:
+  - tool_hoe
+  - tool_wateringcan
+  - tool_harvest
+  - tool_axe
+  NpcInteractionRadiusTiles: 1.25
+  Npcs:
+  - Id: cora
+    DisplayName: Cora
+    X: 8
+    Y: 17
+    Lines:
+    - "Chào buổi sáng! Ruộng nhỏ cũng thành chuyện lớn nếu ngày nào cũng chăm."
+    - "Cây đã gieo thì nhớ tưới trước khi ngủ nhé. Đất khô là cây đứng yên đấy."
+    - "Nếu hôm nay thu hoạch được, thử nghĩ xem mai sẽ trồng thêm ô nào."
+    - "Tôi thích nhìn mảnh ruộng đổi màu sau mỗi lần cuốc — rất dễ biết mình đã làm được gì."
+    FallbackColor: {r: 0.9, g: 0.55, b: 0.95, a: 1}
+  - Id: butch
+    DisplayName: Butch
+    X: 17
+    Y: 12
+    Lines:
+    - "Thấy mấy cây phía kia không? Chặt vài cây là có thêm việc trong lúc chờ mùa vụ lớn."
+    - "Rìu tốn sức hơn cuốc, nên đừng quên giữ stamina cho ruộng trước."
+    - "Gốc cây sẽ mọc lại sau vài ngày. Tôi hay quay lại đúng lúc vụ củ cải tới kỳ."
+    - "Gỗ bán được, nhưng đừng bỏ ruộng chỉ vì vài khúc củi nhanh tay."
+    FallbackColor: {r: 0.75, g: 0.36, b: 0.18, a: 1}

@@ -15,6 +15,7 @@ namespace Prototype.Domain
         public Stamina Stamina;
         public Wallet Wallet;
         public Prototype.Domain.Inventory InventorySystem;
+        public readonly MasterDataSnapshot MasterData;
         public System.Random Rng;
         public Vector2 PlayerPosition;
 
@@ -27,14 +28,15 @@ namespace Prototype.Domain
         /// </summary>
         public readonly int Seed;
 
-        public GameState(int width = 20, int height = 20, int seed = 0)
+        public GameState(int width = 20, int height = 20, int seed = 0, MasterDataSnapshot masterData = null)
         {
             Seed = seed;
+            MasterData = masterData ?? MasterDataSnapshot.CreatePrototypeDefaults();
             Rng = new System.Random(seed);
             Grid = new GridMap(width, height);
             Clock = new GameClock();
-            Stamina = new Stamina(BalanceConfig.MaxStamina);
-            Wallet = new Wallet(BalanceConfig.StartMoney);
+            Stamina = new Stamina(MasterData.Player.MaxStamina);
+            Wallet = new Wallet(MasterData.Player.StartMoney);
             InventorySystem = new Prototype.Domain.Inventory();
             GrantStartingTools();
             SeedTrees();
@@ -44,10 +46,11 @@ namespace Prototype.Domain
         /// <summary>Initial raw inventory composition for the prototype session.</summary>
         public void GrantStartingTools()
         {
-            InventorySystem.Slots[0] = new ItemStack(ToolItemIds.Hoe);
-            InventorySystem.Slots[1] = new ItemStack(ToolItemIds.WateringCan);
-            InventorySystem.Slots[2] = new ItemStack(ToolItemIds.Harvest);
-            InventorySystem.Slots[3] = new ItemStack(ToolItemIds.Axe);
+            for (int i = 0; i < MasterData.StartingItems.Length && i < InventorySystem.Slots.Length; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(MasterData.StartingItems[i]))
+                    InventorySystem.Slots[i] = new ItemStack(MasterData.StartingItems[i]);
+            }
         }
 
         /// <summary>
@@ -63,20 +66,20 @@ namespace Prototype.Domain
         /// </summary>
         void SeedTrees()
         {
-            int count = System.Math.Min(BalanceConfig.InitialTreeCount, Grid.Width);
+            int count = System.Math.Min(MasterData.Tree.InitialCount, Grid.Width);
             int row = Grid.Height - 1;
             for (int i = 0; i < count; i++)
             {
                 var c = new GridCoord(Grid.Width - 1 - i, row);
                 var tile = Grid.GetTile(c);
                 if (tile != null && tile.Type == TileType.Grass && tile.Object == null)
-                    tile.Object = TileObject.NewTree();
+                    tile.Object = TileObject.NewTree(MasterData.Tree.MaxHP);
             }
         }
 
         void SeedNpcBlockers()
         {
-            foreach (var npc in NpcDefinitions.All)
+            foreach (var npc in MasterData.Npcs)
                 Grid.SetStaticBlocker(npc.Coord, true);
         }
 

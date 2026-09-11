@@ -25,6 +25,14 @@ namespace Prototype.Application
         Text _detailTitle, _detailText, _priceText, _feedbackText;
         Button _buyButton;
 
+        CropMasterData CropData(CropId crop) => State?.MasterData?.GetCrop(crop);
+        string SeedItemId(CropId crop) => CropData(crop)?.SeedItemId ?? CropDefinition.SeedItemId(crop);
+        string ProduceItemId(CropId crop) => CropData(crop)?.ProduceItemId ?? CropDefinition.ProduceItemId(crop);
+        int SeedPrice(CropId crop) => CropData(crop)?.SeedPrice ?? CropDefinition.SeedPrice(crop);
+        int SellPrice(CropId crop) => CropData(crop)?.SellPrice ?? CropDefinition.SellPrice(crop);
+        string WoodItemId => State?.MasterData?.Tree?.WoodItemId ?? TreeDefinition.WoodItemId;
+        int WoodSellPrice => State?.MasterData?.Tree?.WoodSellPrice ?? TreeDefinition.WoodSellPrice;
+
         void Awake()
         {
             Instance = this;
@@ -141,9 +149,9 @@ namespace Prototype.Application
         /// <summary>Show detail for an item id, suitable for a UnityEvent(string).</summary>
         public void ShowItemDetail(string itemId)
         {
-            if (itemId == CropDefinition.SeedItemId(CropId.Turnip))
+            if (itemId == SeedItemId(CropId.Turnip))
                 ShowTurnipSeedDetail();
-            else if (itemId == CropDefinition.SeedItemId(CropId.Potato))
+            else if (itemId == SeedItemId(CropId.Potato))
                 ShowPotatoSeedDetail();
         }
 
@@ -182,8 +190,8 @@ namespace Prototype.Application
             else
             {
                 var crop = _selectedCrop.Value;
-                var seedId = CropDefinition.SeedItemId(crop);
-                var price = CropDefinition.SeedPrice(crop);
+                var seedId = SeedItemId(crop);
+                var price = SeedPrice(crop);
                 _detailTitle.text = $"{Label(crop)} Seed";
                 int owned = InventoryService != null
                     ? InventoryService.Count(State.InventorySystem, seedId).GetAwaiter().GetResult().Value
@@ -210,8 +218,8 @@ namespace Prototype.Application
             }
             else
             {
-                string itemId = CropDefinition.SeedItemId(crop);
-                int price = CropDefinition.SeedPrice(crop);
+                string itemId = SeedItemId(crop);
+                int price = SeedPrice(crop);
                 result = new ShopPurchaseResult(MapPurchaseCode(operation.Failure.Code), crop, itemId,
                     price, State.Wallet.Money, State.Wallet.Money, 0, 0);
             }
@@ -231,9 +239,9 @@ namespace Prototype.Application
         public ShopSellResult SellWood()
         {
             int count = InventoryService != null
-                ? InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult().Value
+                ? InventoryService.Count(State.InventorySystem, WoodItemId).GetAwaiter().GetResult().Value
                 : 0;
-            return SellItem(TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, count, "Wood");
+            return SellItem(WoodItemId, WoodSellPrice, count, "Wood");
         }
 
         public ShopSellResult SellTurnip() => SellCrop(CropId.Turnip);
@@ -241,11 +249,11 @@ namespace Prototype.Application
 
         public ShopSellResult SellCrop(CropId crop)
         {
-            string itemId = CropDefinition.ProduceItemId(crop);
+            string itemId = ProduceItemId(crop);
             int count = InventoryService != null
                 ? InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult().Value
                 : 0;
-            return SellItem(itemId, CropDefinition.SellPrice(crop), count, Label(crop));
+            return SellItem(itemId, SellPrice(crop), count, Label(crop));
         }
 
         public ShopSellResult SellItem(string itemId, int pricePerUnit, int count)

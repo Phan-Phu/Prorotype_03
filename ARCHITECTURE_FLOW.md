@@ -1,46 +1,258 @@
 # Architecture flow — Farming Prototype
 
-## Layer flow
+This document describes the current implementation in the `dev` branch. It is
+not a target architecture: the flow below is based on the classes and scene
+that actually exist in the project.
+
+## 1. Current layer map
 
 ```text
-User input / scene UI
-        ↓ intent
-Presentation (MonoBehaviour view/controller)
-        ↓ command/query
-Application (use case, handler, DTO, port)
-        ↓ business call
-Domain (entity, value object, rule, domain event)
-        ↓ port
-Infrastructure (repository, persistence, master data, Unity/plugin adapter)
-        ↓ result/event
-Application → Presentation update
+Unity scene / Unity lifecycle
+        │
+        ▼
+Prototype.Application
+  GameManager          composition root and runtime bootstrap
+  PlayerController     input, movement, active-slot actions
+  WorldView            world rendering
+  HUD                 HUD rendering
+  ToolbarCanvasUI      scene-authored toolbar binding
+  InventoryScreenUI    inventory presentation
+  SeedShopUI           UGUI shop and shop actions
+  NpcDialogueController NPC interaction and dialogue presentation
+  DebugPanel           debug-only controls
+        │
+        │ calls directly
+        ▼
+Prototype.Domain
+  GameState, GridMap, TileData, CropInstance
+  Inventory, Wallet, Stamina, GameClock
+  ToolController, SeedShop, crop/tree/NPC definitions
+        │
+        ▼
+Prototype.Application adapters
+  InventoryQuery / DTOs
+  ArtCatalog / PlaceholderArt
+  SessionLogger
 ```
 
-## Composition root
+`Presentation` has been merged into `Application`. All runtime and UI code now
+uses `Prototype.Application`; domain rules use `Prototype.Domain`. There is no
+`Farm.Prototype.*` namespace in the current source.
 
-`GameManager` is being reduced to the composition root: create the DI scope, register interfaces, connect existing scene-authored components and start the application. Feature logic must move out of `GameManager` into use cases/services.
+The physical folders under `Assets/_Prototype/Scripts/Application/` are only
+for navigation (`UI`, `Player`, `NPC`, `World`, `Debug`, etc.). They are not
+separate architectural layers.
 
-## Feature flow example — buy seed
+## 2. Composition and startup flow
 
-| Step | Layer | Responsibility |
-|---|---|---|
-| 1 | Presentation | SeedShop UI sends `BuySeedCommand(crop)` |
-| 2 | Application | Handler validates request and calls domain port |
-| 3 | Domain | Wallet/inventory rules decide success or failure |
-| 4 | Infrastructure | Repository/persistence stores the changed state |
-| 5 | Application | Returns result and publishes domain event |
-| 6 | Presentation | Shop, wallet and hotbar update from result/event |
+```mermaid
+sequenceDiagram
+    participant U as Unity
+    participant G as GameManager
+    participant S as GameState
+    participant D as Microsoft DI
+    participant C as Application components
 
-## Feature flow example — navigation bar
+    U->>G: AfterSceneLoad bootstrap
+    G->>S: new GameState(BootArgs.Seed)
+    G->>S: apply start day and start money
+    G->>D: register IInventoryReader and IInventoryQuery
+    G->>C: find or create camera/world/player/HUD/UI/NPC/debug
+    G->>C: assign State and Player references
+    loop every frame
+        G->>S: GameClock.Tick(deltaTime)
+    end
+```
 
-| Step | Layer | Responsibility |
-|---|---|---|
-| 1 | Editor | Canvas, bar background, slots, anchors and item Image containers are authored in scene |
-| 2 | Application | Inventory query exposes current slot data |
-| 3 | Presentation | Toolbar presenter maps data to Image sprites and selection state |
-| 4 | Presentation | Click sends select-slot intent to player/application |
-| 5 | Domain/Application | Active item/tool decision is validated and applied |
+`GameManager` is the actual composition root. It creates the domain state,
+builds the Microsoft DI service provider, then wires the MonoBehaviours. It
+does not use a separate application handler layer yet.
 
-## Async/events
+Important bootstrap behavior:
 
-Use UniTask at async boundaries. Domain events are plain contracts; the event manager is an adapter at the application boundary. UI must unsubscribe on disable/destroy. No UI component owns inventory/economy rules.
+- `Prototype_Main.unity` contains the main camera and authored UI canvas roots.
+- `ToolbarCanvasUI` is found in the scene and bound to `Player` and
+  `IInventoryQuery`; the toolbar is not created by `GameManager`.
+- Missing runtime components such as `PlayerController`, `HUD`,
+  `InventoryScreenUI`, `SeedShopUI`, NPC and debug components are created by
+  `GameManager` when absent.
+- World and scenery are created/bound at runtime from `GameState` and
+  `ArtCatalog`.
+
+## 3. Domain state ownership
+
+```mermaid
+erDiagram
+    GAME_STATE ||--|| GRID_MAP : owns
+    GAME_STATE ||--|| GAME_CLOCK : owns
+    GAME_STATE ||--|| INVENTORY : owns
+    GAME_STATE ||--|| WALLET : owns
+    GAME_STATE ||--|| STAMINA : owns
+    GRID_MAP ||--|{ TILE_DATA : contains
+    TILE_DATA ||--o| CROP_INSTANCE : contains
+    TILE_DATA ||--o| TILE_OBJECT : contains
+    INVENTORY ||--o{ ITEM_STACK : contains
+
+    GAME_STATE {
+        int Seed
+        GridMap Grid
+        GameClock Clock
+        Inventory InventorySystem
+        Wallet Wallet
+        Stamina Stamina
+    }
+    TILE_DATA {
+        TileType Type
+        bool IsWatered
+    }
+    CROP_INSTANCE {
+        CropId Id
+        int DaysGrown
+        bool WateredToday
+    }
+    TILE_OBJECT {
+        TileObjectType Type
+        int HP
+        int RespawnDaysLeft
+    }
+    ITEM_STACK {
+        string ItemId
+        int Count
+    }
+```
+
+`GameState` is the shared state boundary used by runtime, tests and the
+headless simulation. `ToolController` and `SeedShop` are plain domain rules;
+they return structured results instead of updating UI.
+
+## 4. Player action flow
+
+```text
+Keyboard / mouse
+      ↓
+PlayerController.Update()
+      ↓
+read active Inventory slot
+      ↓
+resolve item to action
+      ├─ Hoe / WateringCan / Harvest / Axe → GameState.UseTool()
+      ├─ Turnip/Potato seed                → GameState.PlantSpecific()
+      └─ interaction tile                  → SeedShopUI.OpenCurrent()
+      ↓
+ToolController validates tile, stamina, inventory and object state
+      ↓
+GameState mutates Grid / Inventory / Wallet / Stamina
+      ↓
+PlayerController and UI components redraw from current state
+```
+
+Tree collision and the cursor use the same `GridMap.IsOccupied()` query. A
+felled tree remains an occupied tile until its respawn countdown completes.
+
+## 5. Seed shop flow
+
+```mermaid
+sequenceDiagram
+    participant P as PlayerController
+    participant V as SeedShopUI
+    participant D as SeedShop / GameState
+    participant I as Inventory
+    participant W as Wallet
+
+    P->>V: OpenCurrent()
+    V->>V: open ShopPanel, clear selected item, lock gameplay
+    V->>V: list Turnip Seed and Potato Seed
+    P->>V: select item
+    V->>V: show detail, price and owned count
+    P->>V: BuySelectedItem()
+    V->>D: State.BuySeed(crop)
+    D->>W: validate and spend money
+    D->>I: add seed when capacity allows
+    D-->>V: ShopPurchaseResult
+    V->>V: show feedback and refresh price/owned count
+```
+
+`SeedShopUI` is a UGUI component. It currently ensures the shop controls under
+the scene-authored `ShopPanel` at runtime (`TitleText`, `ItemListPanel`,
+`DetailPanel`, `PurchasePanel`, `BuyButton`, and `CloseButton`). Its public
+Inspector-callable entry points are:
+
+- `ListItems`, `ListItem(string)`
+- `ListTurnipSeed`, `ListPotatoSeed`
+- `ShowItemDetail(string)`, `ShowTurnipSeedDetail`, `ShowPotatoSeedDetail`
+- `BuySelectedItem`, `BuyTurnipItem`, `BuyPotatoItem`
+
+The domain transaction is atomic with respect to insufficient funds and full
+inventory: it validates before changing wallet or inventory.
+
+## 6. Toolbar, HUD and inventory flow
+
+```text
+GameState.InventorySystem
+        │
+        ├─ InventoryQuery → InventorySnapshot / InventorySlotData
+        │                    → ToolbarCanvasUI (scene-authored UGUI)
+        │
+        ├─ direct state read → HUD / InventoryScreenUI
+        │
+        └─ active slot → PlayerController action resolution
+```
+
+The toolbar background, slot objects, anchors and responsive canvas are
+scene-authored. Runtime code updates item images, counts and selection state.
+`InventoryQuery` exists as the read-side adapter registered by DI; the domain
+inventory remains the source of truth.
+
+## 7. NPC dialogue flow
+
+```text
+Player near Cora/Butch
+        ↓ E
+NpcDialogueController finds nearby NpcDefinition
+        ↓
+DialogueState opens at line 0
+        ↓ E / Enter / Space
+advance line or close at final line
+        ↓ Esc
+close early and unlock gameplay
+```
+
+NPC definitions and dialogue state live in `Prototype.Domain`. The controller
+owns proximity, input and presentation. There are no quests, branching choices,
+relationship values or schedules in the current implementation.
+
+## 8. Art and infrastructure flow
+
+```text
+Source sprites
+      ↓ Editor CIArt / ArtCatalog
+Resources/ArtCatalog.asset
+      ↓
+PlaceholderArt
+      ├─ WorldView / scenery SpriteRenderers
+      ├─ PlayerController player art
+      └─ Toolbar/UI item icons
+
+GameState / actions
+      ↓
+SessionLogger → local Artifacts/session_<seed>.csv
+```
+
+`ArtCatalog` and `SessionLogger` are currently in the `Prototype.Application`
+namespace even though their folders identify them as infrastructure adapters.
+They are not domain rules.
+
+## 9. Testing and current boundary
+
+- EditMode tests exercise domain rules, economy, crops, tools, clock, NPC state
+  and DTO/query behavior without a scene.
+- PlayMode tests boot the real scene and cover component wiring, collision,
+  player-facing behavior and UI smoke paths.
+- `HeadlessSim` runs the same `GameState`/domain rules for economy checks.
+- Unity CLI is used for compile/test/build validation.
+
+The current implementation is a pragmatic layered architecture, not a fully
+separated MVC/CQRS application. UI MonoBehaviours still contain some controller
+logic and call `GameState` directly. New features should keep rules in Domain,
+put UI intent/state mapping in Application, and leave layout/art references in
+the scene or art catalog.

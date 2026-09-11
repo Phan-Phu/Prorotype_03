@@ -4,6 +4,53 @@ This document describes the current implementation in the `dev` branch. It is
 not a target architecture: the flow below is based on the classes and scene
 that actually exist in the project.
 
+## 0. High-level runtime flow
+
+The following diagram shows how input travels through the current Unity scene,
+application components and domain state before the UI is refreshed.
+
+```mermaid
+flowchart LR
+    subgraph Scene[Prototype_Main scene]
+        Input[Keyboard / mouse]
+        Canvas[UI Canvas\nHUD / Toolbar / Shop / Dialogue]
+        World[World objects\nmap / player / NPCs]
+    end
+
+    Bootstrap[GameManager\ncomposition root] --> State[GameState]
+    Bootstrap --> DI[Microsoft DI\nInventoryQuery adapter]
+
+    Input --> Player[PlayerController]
+    Input --> UIIntent[UI intent\nbutton / selection / dialogue]
+    Player --> Actions[Application action mapping]
+    UIIntent --> Actions
+    Actions --> Domain[Domain rules\nToolController / SeedShop / DialogueState]
+    Domain --> State
+    State --> Query[InventoryQuery / DTO snapshots]
+    State --> World
+    State --> HUD[HUD / clock]
+    Query --> Canvas
+    Domain --> Canvas
+    World --> Canvas
+
+    subgraph Features[Feature flows]
+        Farm[Hoe / plant / water / harvest / axe]
+        Economy[Buy seed / sell goods]
+        NPC[Cora / Butch dialogue]
+    end
+    Actions --> Farm
+    Actions --> Economy
+    Actions --> NPC
+    Farm --> State
+    Economy --> State
+    NPC --> State
+```
+
+Runtime ownership is intentionally explicit: the scene owns layout and art
+references, Application owns input-to-view coordination, and Domain owns
+state transitions and validation. UI never becomes the source of truth for
+inventory, wallet, crops or time.
+
 ## 1. Current layer map
 
 ```text

@@ -185,7 +185,7 @@ namespace Prototype.Application
                 var price = CropDefinition.SeedPrice(crop);
                 _detailTitle.text = $"{Label(crop)} Seed";
                 int owned = InventoryService != null
-                    ? InventoryService.Count(State.InventorySystem, seedId).GetAwaiter().GetResult().Data
+                    ? InventoryService.Count(State.InventorySystem, seedId).GetAwaiter().GetResult().Value
                     : 0;
                 _detailText.text = $"Plant this seed on prepared soil.\n\nPrice: {price}g\nOwned: {owned}";
                 _priceText.text = $"{price}g   Money: {State.Wallet.Money}";
@@ -199,11 +199,11 @@ namespace Prototype.Application
         {
             var operation = GameplayService != null
                 ? GameplayService.BuySeed(State, crop).GetAwaiter().GetResult()
-                : OperationResult<ShopPurchaseDto>.Failed(FailureCode.NotInitialized, "gameplay");
+                : ResultFactory.Failure<GameplayFailure, ShopPurchaseDto>(GameplayFailure.NotInitialized("gameplay"));
             ShopPurchaseResult result;
             if (operation.IsSuccess)
             {
-                var dto = operation.Data;
+                var dto = operation.Value;
                 result = new ShopPurchaseResult(dto.Code, dto.Crop, dto.ItemId, dto.Price,
                     dto.MoneyBefore, dto.MoneyAfter, dto.CountBefore, dto.CountAfter);
             }
@@ -211,13 +211,13 @@ namespace Prototype.Application
             {
                 string itemId = CropDefinition.SeedItemId(crop);
                 int price = CropDefinition.SeedPrice(crop);
-                result = new ShopPurchaseResult(MapPurchaseCode(operation.FailureCode), crop, itemId,
+                result = new ShopPurchaseResult(MapPurchaseCode(operation.Failure.Code), crop, itemId,
                     price, State.Wallet.Money, State.Wallet.Money, 0, 0);
             }
             SessionLogger.LogShopPurchase(State, result);
             _feedbackText.text = result.IsSuccess
                 ? $"Bought {Label(crop)} seed"
-                : PurchaseFailureMessage(operation.FailureCode);
+                : PurchaseFailureMessage(operation.Failure.Code);
             RefreshUi();
             return result;
         }
@@ -230,7 +230,7 @@ namespace Prototype.Application
         public ShopSellResult SellWood()
         {
             int count = InventoryService != null
-                ? InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult().Data
+                ? InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult().Value
                 : 0;
             return SellItem(TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, count, "Wood");
         }
@@ -242,7 +242,7 @@ namespace Prototype.Application
         {
             string itemId = CropDefinition.ProduceItemId(crop);
             int count = InventoryService != null
-                ? InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult().Data
+                ? InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult().Value
                 : 0;
             return SellItem(itemId, CropDefinition.SellPrice(crop), count, Label(crop));
         }
@@ -254,22 +254,22 @@ namespace Prototype.Application
         {
             var operation = GameplayService != null
                 ? GameplayService.SellItem(State, itemId, pricePerUnit, count).GetAwaiter().GetResult()
-                : OperationResult<ShopSellDto>.Failed(FailureCode.NotInitialized, "gameplay");
+                : ResultFactory.Failure<GameplayFailure, ShopSellDto>(GameplayFailure.NotInitialized("gameplay"));
             ShopSellResult result;
             if (operation.IsSuccess)
             {
-                var dto = operation.Data;
+                var dto = operation.Value;
                 result = new ShopSellResult(dto.Code, dto.ItemId, pricePerUnit, count, dto.Earned,
                     dto.MoneyBefore, dto.MoneyAfter, dto.CountBefore, dto.CountAfter);
             }
             else
             {
-                result = new ShopSellResult(MapSellCode(operation.FailureCode), itemId, pricePerUnit,
+                result = new ShopSellResult(MapSellCode(operation.Failure.Code), itemId, pricePerUnit,
                     count, 0, State.Wallet.Money, State.Wallet.Money, 0, 0);
             }
             _feedbackText.text = result.IsSuccess
                 ? $"Sold {displayName} for {result.Earned}g"
-                : SellFailureMessage(operation.FailureCode, displayName);
+                : SellFailureMessage(operation.Failure.Code, displayName);
             return result;
         }
 

@@ -39,13 +39,15 @@ outside this repository.
   feature-specific snapshot wrapper. The inventory UI consumes the concrete
   Infrastructure service directly; there is no redundant `IInventoryQuery`
   interface.
-- Infrastructure operations return `UniTask<OperationResult>` or the generic
-  `OperationResult<T>`. Expected gameplay failures use `FailureCode` values
+- Infrastructure operations return typed `UniTask<Result<TFailure, TValue>>`
+  values through `ResultFactory`. Expected gameplay failures use feature
+  failure types such as `InventoryFailure` and `GameplayFailure`, with
+  `FailureCode` values
   such as `NotEnoughMoney`, `InventoryFull`, `InsufficientInventory` and
   `InvalidArgument`; unexpected exceptions are logged and returned as
   `SystemError`.
 - Infrastructure exposes UniTask operations directly; success and failure are
-  returned through `OperationResult` instead of duplicate sync/`*Async`
+  returned through `Result<TFailure, TValue>` instead of duplicate sync/`*Async`
   methods for Inventory and Gameplay.
 - UI is UGUI-based. Scene-authored objects provide the layout; application
   components bind state and user intent at runtime.

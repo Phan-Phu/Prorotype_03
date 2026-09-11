@@ -190,6 +190,6 @@ namespace Prototype.Application
         }
 
         int CountInventory(string itemId)
-            => InventoryService == null ? 0 : InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult().Data;
+            => InventoryService == null ? 0 : InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult().Value;
     }
 }

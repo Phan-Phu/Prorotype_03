@@ -7,8 +7,7 @@ namespace Prototype.Application
 {
     /// <summary>
     /// Infrastructure implementation of the Domain inventory port. Mutating operations complete
-    /// with an explicit success or a machine-readable failure; expected gameplay failures do not
-    /// throw exceptions. Read projections use GenericMapper and remain payload-only.
+    /// with typed InventoryFailure results; expected gameplay failures do not throw exceptions.
     /// </summary>
     public sealed class InventoryService : Prototype.Domain.IInventoryService
     {
@@ -35,74 +34,74 @@ namespace Prototype.Application
                 return slots;
             });
 
-        public InventorySlotData[] Read()
-            => Read(_boundInventory);
+        public InventorySlotData[] Read() => Read(_boundInventory);
 
         public UniTask<InventorySlotData[]> ReadAsync(Inventory inventory)
             => UniTask.FromResult(Read(inventory));
 
-        public UniTask<OperationResult> Add(Inventory inventory, string itemId, int amount = 1)
+        public UniTask<Result<InventoryFailure, Unit>> Add(Inventory inventory, string itemId, int amount = 1)
             => UniTask.FromResult(SafeAdd(inventory, itemId, amount));
 
-        public UniTask<OperationResult> Remove(Inventory inventory, string itemId, int amount = 1)
+        public UniTask<Result<InventoryFailure, Unit>> Remove(Inventory inventory, string itemId, int amount = 1)
             => UniTask.FromResult(SafeRemove(inventory, itemId, amount));
 
-        public UniTask<OperationResult> CanAdd(Inventory inventory, string itemId)
+        public UniTask<Result<InventoryFailure, Unit>> CanAdd(Inventory inventory, string itemId)
             => UniTask.FromResult(SafeCanAdd(inventory, itemId));
 
-        public UniTask<OperationResult<int>> Count(Inventory inventory, string itemId)
+        public UniTask<Result<InventoryFailure, int>> Count(Inventory inventory, string itemId)
             => UniTask.FromResult(SafeCount(inventory, itemId));
 
-        public UniTask<OperationResult> Clear(Inventory inventory)
+        public UniTask<Result<InventoryFailure, Unit>> Clear(Inventory inventory)
             => UniTask.FromResult(SafeClear(inventory));
 
-        public UniTask<OperationResult> Swap(Inventory inventory, int firstSlot, int secondSlot)
+        public UniTask<Result<InventoryFailure, Unit>> Swap(Inventory inventory, int firstSlot, int secondSlot)
             => UniTask.FromResult(SafeSwap(inventory, firstSlot, secondSlot));
 
-        OperationResult SafeAdd(Inventory inventory, string itemId, int amount)
+        Result<InventoryFailure, Unit> SafeAdd(Inventory inventory, string itemId, int amount)
         {
             try { return AddInternal(inventory, itemId, amount); }
             catch (Exception ex) { return SystemFailure("inventory.add", ex); }
         }
 
-        OperationResult SafeRemove(Inventory inventory, string itemId, int amount)
+        Result<InventoryFailure, Unit> SafeRemove(Inventory inventory, string itemId, int amount)
         {
             try { return RemoveInternal(inventory, itemId, amount); }
             catch (Exception ex) { return SystemFailure("inventory.remove", ex); }
         }
 
-        OperationResult SafeCanAdd(Inventory inventory, string itemId)
+        Result<InventoryFailure, Unit> SafeCanAdd(Inventory inventory, string itemId)
         {
             try { return CanAddInternal(inventory, itemId); }
             catch (Exception ex) { return SystemFailure("inventory.can_add", ex); }
         }
 
-        OperationResult<int> SafeCount(Inventory inventory, string itemId)
+        Result<InventoryFailure, int> SafeCount(Inventory inventory, string itemId)
         {
             try { return CountInternal(inventory, itemId); }
             catch (Exception ex)
             {
-                return SystemFailure<int>("inventory.count", ex);
+                Debug.LogException(ex);
+                return ResultFactory.Failure<InventoryFailure, int>(InventoryFailure.System("inventory.count"));
             }
         }
 
-        OperationResult SafeClear(Inventory inventory)
+        Result<InventoryFailure, Unit> SafeClear(Inventory inventory)
         {
             try { return ClearInternal(inventory); }
             catch (Exception ex) { return SystemFailure("inventory.clear", ex); }
         }
 
-        OperationResult SafeSwap(Inventory inventory, int firstSlot, int secondSlot)
+        Result<InventoryFailure, Unit> SafeSwap(Inventory inventory, int firstSlot, int secondSlot)
         {
             try { return SwapInternal(inventory, firstSlot, secondSlot); }
             catch (Exception ex) { return SystemFailure("inventory.swap", ex); }
         }
 
-        static OperationResult AddInternal(Inventory inventory, string itemId, int amount)
+        static Result<InventoryFailure, Unit> AddInternal(Inventory inventory, string itemId, int amount)
         {
-            if (inventory == null) return OperationResult.Failed(FailureCode.NotInitialized, "inventory");
-            if (string.IsNullOrEmpty(itemId) || amount <= 0)
-                return OperationResult.Failed(FailureCode.InvalidArgument, "itemId/amount");
+            if (inventory == null) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.NotInitialized());
+            if (string.IsNullOrEmpty(itemId)) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.InvalidArgument("itemId"));
+            if (amount <= 0) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.ItemQuantityNegative(itemId, amount));
 
             for (int i = 0; i < inventory.Slots.Length; i++)
             {
@@ -110,7 +109,7 @@ namespace Prototype.Application
                 if (!IsLocked(inventory, i) && stack != null && stack.ItemId == itemId)
                 {
                     stack.Add(amount);
-                    return OperationResult.Success();
+                    return ResultFactory.Success<InventoryFailure, Unit>(Unit.Value);
                 }
             }
 
@@ -122,51 +121,47 @@ namespace Prototype.Application
                 if (inventory.Slots[i] == null)
                 {
                     inventory.Slots[i] = new ItemStack(itemId, amount);
-                    return OperationResult.Success();
+                    return ResultFactory.Success<InventoryFailure, Unit>(Unit.Value);
                 }
             }
 
-            return OperationResult.Failed(
-                hasUnlockedSlot ? FailureCode.InventoryFull : FailureCode.LockedSlot,
-                itemId);
+            return hasUnlockedSlot
+                ? ResultFactory.Failure<InventoryFailure>(InventoryFailure.Full(itemId))
+                : ResultFactory.Failure<InventoryFailure>(InventoryFailure.Locked());
         }
 
-        static OperationResult RemoveInternal(Inventory inventory, string itemId, int amount)
+        static Result<InventoryFailure, Unit> RemoveInternal(Inventory inventory, string itemId, int amount)
         {
-            if (inventory == null) return OperationResult.Failed(FailureCode.NotInitialized, "inventory");
-            if (string.IsNullOrEmpty(itemId) || amount <= 0)
-                return OperationResult.Failed(FailureCode.InvalidArgument, "itemId/amount");
+            if (inventory == null) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.NotInitialized());
+            if (string.IsNullOrEmpty(itemId)) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.InvalidArgument("itemId"));
+            if (amount <= 0) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.ItemQuantityNegative(itemId, amount));
 
             int total = 0;
             for (int i = 0; i < inventory.Slots.Length; i++)
             {
                 var stack = inventory.Slots[i];
-                if (!IsLocked(inventory, i) && stack != null && stack.ItemId == itemId)
-                    total += stack.Count;
+                if (!IsLocked(inventory, i) && stack != null && stack.ItemId == itemId) total += stack.Count;
             }
 
-            if (total == 0) return OperationResult.Failed(FailureCode.ItemNotFound, itemId);
-            if (total < amount)
-                return OperationResult.Failed(FailureCode.InsufficientInventory, itemId, amount, total);
+            if (total == 0) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.ItemNotFound(itemId));
+            if (total < amount) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.InsufficientQuantity(itemId, amount, total));
 
             for (int i = 0; i < inventory.Slots.Length; i++)
             {
                 var stack = inventory.Slots[i];
-                if (IsLocked(inventory, i) || stack == null || stack.ItemId != itemId || stack.Count < amount)
-                    continue;
+                if (IsLocked(inventory, i) || stack == null || stack.ItemId != itemId || stack.Count < amount) continue;
                 stack.Remove(amount);
                 if (stack.Count <= 0) inventory.Slots[i] = null;
-                return OperationResult.Success();
+                return ResultFactory.Success<InventoryFailure, Unit>(Unit.Value);
             }
 
-            return OperationResult.Failed(FailureCode.InvalidState, itemId);
+            return ResultFactory.Failure<InventoryFailure>(InventoryFailure.InvalidArgument("inventory state"));
         }
 
-        static OperationResult CanAddInternal(Inventory inventory, string itemId)
+        static Result<InventoryFailure, Unit> CanAddInternal(Inventory inventory, string itemId)
         {
-            if (inventory == null) return OperationResult.Failed(FailureCode.NotInitialized, "inventory");
-            if (string.IsNullOrEmpty(itemId))
-                return OperationResult.Failed(FailureCode.InvalidArgument, "itemId");
+            if (inventory == null) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.NotInitialized());
+            if (string.IsNullOrEmpty(itemId)) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.InvalidArgument("itemId"));
 
             bool hasUnlockedSlot = false;
             for (int i = 0; i < inventory.Slots.Length; i++)
@@ -174,19 +169,18 @@ namespace Prototype.Application
                 if (IsLocked(inventory, i)) continue;
                 hasUnlockedSlot = true;
                 if (inventory.Slots[i] == null || inventory.Slots[i].ItemId == itemId)
-                    return OperationResult.Success();
+                    return ResultFactory.Success<InventoryFailure, Unit>(Unit.Value);
             }
 
-            return OperationResult.Failed(
-                hasUnlockedSlot ? FailureCode.InventoryFull : FailureCode.LockedSlot,
-                itemId);
+            return hasUnlockedSlot
+                ? ResultFactory.Failure<InventoryFailure>(InventoryFailure.Full(itemId))
+                : ResultFactory.Failure<InventoryFailure>(InventoryFailure.Locked());
         }
 
-        static OperationResult<int> CountInternal(Inventory inventory, string itemId)
+        static Result<InventoryFailure, int> CountInternal(Inventory inventory, string itemId)
         {
-            if (inventory == null) return OperationResult<int>.Failed(FailureCode.NotInitialized, "inventory");
-            if (string.IsNullOrEmpty(itemId))
-                return OperationResult<int>.Failed(FailureCode.InvalidArgument, "itemId");
+            if (inventory == null) return ResultFactory.Failure<InventoryFailure, int>(InventoryFailure.NotInitialized());
+            if (string.IsNullOrEmpty(itemId)) return ResultFactory.Failure<InventoryFailure, int>(InventoryFailure.InvalidArgument("itemId"));
 
             int total = 0;
             for (int i = 0; i < inventory.Slots.Length; i++)
@@ -194,46 +188,40 @@ namespace Prototype.Application
                 var stack = inventory.Slots[i];
                 if (stack != null && stack.ItemId == itemId) total += stack.Count;
             }
-            return OperationResult<int>.Success(total);
+            return ResultFactory.Success<InventoryFailure, int>(total);
         }
 
-        static OperationResult ClearInternal(Inventory inventory)
+        static Result<InventoryFailure, Unit> ClearInternal(Inventory inventory)
         {
-            if (inventory == null) return OperationResult.Failed(FailureCode.NotInitialized, "inventory");
+            if (inventory == null) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.NotInitialized());
             for (int i = 0; i < inventory.Slots.Length; i++)
                 if (!IsLocked(inventory, i)) inventory.Slots[i] = null;
-            return OperationResult.Success();
+            return ResultFactory.Success<InventoryFailure, Unit>(Unit.Value);
         }
 
-        static OperationResult SwapInternal(Inventory inventory, int firstSlot, int secondSlot)
+        static Result<InventoryFailure, Unit> SwapInternal(Inventory inventory, int firstSlot, int secondSlot)
         {
-            if (inventory == null) return OperationResult.Failed(FailureCode.NotInitialized, "inventory");
+            if (inventory == null) return ResultFactory.Failure<InventoryFailure>(InventoryFailure.NotInitialized());
             if (firstSlot < 0 || secondSlot < 0
                 || firstSlot >= inventory.Slots.Length || secondSlot >= inventory.Slots.Length
                 || firstSlot == secondSlot)
-                return OperationResult.Failed(FailureCode.InvalidArgument, "slot");
+                return ResultFactory.Failure<InventoryFailure>(InventoryFailure.InvalidArgument("slot"));
             if (IsLocked(inventory, firstSlot) || IsLocked(inventory, secondSlot))
-                return OperationResult.Failed(FailureCode.LockedSlot, "slot");
+                return ResultFactory.Failure<InventoryFailure>(InventoryFailure.Locked());
 
             (inventory.Slots[firstSlot], inventory.Slots[secondSlot]) =
                 (inventory.Slots[secondSlot], inventory.Slots[firstSlot]);
-            return OperationResult.Success();
+            return ResultFactory.Success<InventoryFailure, Unit>(Unit.Value);
         }
 
         static bool IsLocked(Inventory inventory, int slot)
             => inventory.LockedSlots != null && slot >= 0 && slot < inventory.LockedSlots.Length
                 && inventory.LockedSlots[slot];
 
-        static OperationResult SystemFailure(string context, Exception exception)
+        static Result<InventoryFailure, Unit> SystemFailure(string context, Exception exception)
         {
             Debug.LogException(exception);
-            return OperationResult.Failed(FailureCode.SystemError, context);
-        }
-
-        static OperationResult<T> SystemFailure<T>(string context, Exception exception)
-        {
-            Debug.LogException(exception);
-            return OperationResult<T>.Failed(FailureCode.SystemError, context);
+            return ResultFactory.Failure<InventoryFailure>(InventoryFailure.System(context));
         }
     }
 }

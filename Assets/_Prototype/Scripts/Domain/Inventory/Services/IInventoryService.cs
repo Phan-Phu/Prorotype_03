@@ -9,11 +9,11 @@ namespace Prototype.Domain
     /// </summary>
     public interface IInventoryService
     {
-        UniTask<OperationResult> Add(Inventory inventory, string itemId, int amount = 1);
-        UniTask<OperationResult> Remove(Inventory inventory, string itemId, int amount = 1);
-        UniTask<OperationResult> CanAdd(Inventory inventory, string itemId);
-        UniTask<OperationResult<int>> Count(Inventory inventory, string itemId);
-        UniTask<OperationResult> Clear(Inventory inventory);
-        UniTask<OperationResult> Swap(Inventory inventory, int firstSlot, int secondSlot);
+        UniTask<Result<InventoryFailure, Unit>> Add(Inventory inventory, string itemId, int amount = 1);
+        UniTask<Result<InventoryFailure, Unit>> Remove(Inventory inventory, string itemId, int amount = 1);
+        UniTask<Result<InventoryFailure, Unit>> CanAdd(Inventory inventory, string itemId);
+        UniTask<Result<InventoryFailure, int>> Count(Inventory inventory, string itemId);
+        UniTask<Result<InventoryFailure, Unit>> Clear(Inventory inventory);
+        UniTask<Result<InventoryFailure, Unit>> Swap(Inventory inventory, int firstSlot, int secondSlot);
     }
 }

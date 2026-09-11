@@ -107,12 +107,12 @@ namespace Prototype.Application
                 // 6. Sell carried produce and wood through the same sell channel a real interaction
                 // uses; harvest itself only adds produce to inventory, it no longer credits Wallet.
                 gameplay.SellItem(state, CropDefinition.ProduceItemId(CropId.Turnip),
-                    CropDefinition.SellPrice(CropId.Turnip), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Turnip)).GetAwaiter().GetResult().Data);
+                    CropDefinition.SellPrice(CropId.Turnip), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Turnip)).GetAwaiter().GetResult().Value);
                 gameplay.SellItem(state, CropDefinition.ProduceItemId(CropId.Potato),
-                    CropDefinition.SellPrice(CropId.Potato), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Potato)).GetAwaiter().GetResult().Data);
+                    CropDefinition.SellPrice(CropId.Potato), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Potato)).GetAwaiter().GetResult().Value);
                 var woodResult = gameplay.SellItem(state, TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice,
-                    inventory.Count(state.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult().Data).GetAwaiter().GetResult();
-                int woodIncome = woodResult.IsSuccess ? woodResult.Data.Earned : 0;
+                    inventory.Count(state.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult().Value).GetAwaiter().GetResult();
+                int woodIncome = woodResult.IsSuccess ? woodResult.Value.Earned : 0;
 
                 int staminaUsed = staminaStart - state.Stamina.Current;
                 sb.AppendLine($"{state.Clock.Day},{state.Wallet.Money},{plots.Count},{staminaUsed},{harvested},{woodHarvested},{woodIncome}");
@@ -152,7 +152,7 @@ namespace Prototype.Application
                     {
                         var r = gameplay.UseTool(state, ToolType.Chop, c).GetAwaiter().GetResult();
                         if (!r.IsSuccess) return wood; // out of stamina — stop for the day
-                        wood += r.Data.Amount; // >0 only on the felling hit
+                        wood += r.Value.Amount; // >0 only on the felling hit
                     }
                 }
             return wood;

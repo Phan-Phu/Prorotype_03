@@ -7,7 +7,7 @@ namespace Prototype.Application
 {
     /// <summary>
     /// Infrastructure implementation for tool, shop and economy behavior. Public operations are
-    /// UniTask-based and always complete with an explicit success or failure result.
+    /// UniTask-based and return the feature-specific GameplayFailure through the generic Result.
     /// </summary>
     public sealed class GameplayService : IGameplayService
     {
@@ -15,59 +15,45 @@ namespace Prototype.Application
 
         public GameplayService(Prototype.Domain.IInventoryService inventory) => _inventory = inventory;
 
-        public UniTask<OperationResult<ToolActionDto>> UseTool(GameState state, ToolType tool, GridCoord coord)
+        public UniTask<Result<GameplayFailure, ToolActionDto>> UseTool(GameState state, ToolType tool, GridCoord coord)
             => UniTask.FromResult(SafeUseTool(state, tool, coord));
 
-        public UniTask<OperationResult<ToolActionDto>> PlantSpecific(GameState state, CropId crop, GridCoord coord)
+        public UniTask<Result<GameplayFailure, ToolActionDto>> PlantSpecific(GameState state, CropId crop, GridCoord coord)
             => UniTask.FromResult(SafePlantSpecific(state, crop, coord));
 
-        public UniTask<OperationResult<ShopPurchaseDto>> BuySeed(GameState state, CropId crop)
+        public UniTask<Result<GameplayFailure, ShopPurchaseDto>> BuySeed(GameState state, CropId crop)
             => UniTask.FromResult(SafeBuySeed(state, crop));
 
-        public UniTask<OperationResult<ShopSellDto>> SellItem(GameState state, string itemId, int pricePerUnit, int count)
+        public UniTask<Result<GameplayFailure, ShopSellDto>> SellItem(GameState state, string itemId, int pricePerUnit, int count)
             => UniTask.FromResult(SafeSellItem(state, itemId, pricePerUnit, count));
 
-        OperationResult<ToolActionDto> SafeUseTool(GameState state, ToolType tool, GridCoord coord)
+        Result<GameplayFailure, ToolActionDto> SafeUseTool(GameState state, ToolType tool, GridCoord coord)
         {
-            try
-            {
-                var dto = UseToolInternal(state, tool, coord);
-                return ToToolResult(dto, "gameplay.use_tool");
-            }
-            catch (Exception ex)
-            {
-                return SystemFailure<ToolActionDto>("gameplay.use_tool", ex, Fail(ToolResultCode.WrongTool));
-            }
+            try { return ToToolResult(UseToolInternal(state, tool, coord), "gameplay.use_tool"); }
+            catch (Exception ex) { return SystemFailure("gameplay.use_tool", ex, Fail(ToolResultCode.SystemError)); }
         }
 
-        OperationResult<ToolActionDto> SafePlantSpecific(GameState state, CropId crop, GridCoord coord)
+        Result<GameplayFailure, ToolActionDto> SafePlantSpecific(GameState state, CropId crop, GridCoord coord)
         {
-            try
-            {
-                var dto = PlantSpecificInternal(state, crop, coord);
-                return ToToolResult(dto, "gameplay.plant_specific");
-            }
-            catch (Exception ex)
-            {
-                return SystemFailure<ToolActionDto>("gameplay.plant_specific", ex, Fail(ToolResultCode.WrongTool));
-            }
+            try { return ToToolResult(PlantSpecificInternal(state, crop, coord), "gameplay.plant_specific"); }
+            catch (Exception ex) { return SystemFailure("gameplay.plant_specific", ex, Fail(ToolResultCode.SystemError)); }
         }
 
-        OperationResult<ShopPurchaseDto> SafeBuySeed(GameState state, CropId crop)
+        Result<GameplayFailure, ShopPurchaseDto> SafeBuySeed(GameState state, CropId crop)
         {
             try
             {
-                if (state == null) return OperationResult<ShopPurchaseDto>.Failed(FailureCode.NotInitialized, "game_state");
+                if (state == null)
+                    return ResultFactory.Failure<GameplayFailure, ShopPurchaseDto>(GameplayFailure.NotInitialized("game_state"));
 
                 string itemId = CropDefinition.SeedItemId(crop);
                 int price = CropDefinition.SeedPrice(crop);
                 int moneyBefore = state.Wallet.Money;
-                var countBeforeResult = _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult();
-                if (!countBeforeResult.IsSuccess) return Propagate<ShopPurchaseDto>(countBeforeResult, itemId);
+                var countBefore = _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult();
+                if (!countBefore.IsSuccess) return Propagate<ShopPurchaseDto>(countBefore, itemId);
 
-                int countBefore = countBeforeResult.Data;
                 if (moneyBefore < price)
-                    return OperationResult<ShopPurchaseDto>.Failed(FailureCode.NotEnoughMoney, itemId, price, moneyBefore);
+                    return ResultFactory.Failure<GameplayFailure, ShopPurchaseDto>(GameplayFailure.NotEnoughMoney(itemId, price, moneyBefore));
 
                 var canAdd = _inventory.CanAdd(state.InventorySystem, itemId).GetAwaiter().GetResult();
                 if (!canAdd.IsSuccess) return Propagate<ShopPurchaseDto>(canAdd, itemId);
@@ -78,29 +64,26 @@ namespace Prototype.Application
                 state.Wallet.Money -= price;
                 var result = new ShopPurchaseResult(
                     ShopPurchaseResultCode.Success, crop, itemId, price,
-                    moneyBefore, state.Wallet.Money, countBefore, countBefore + 1);
-                return OperationResult<ShopPurchaseDto>.Success(new ShopPurchaseDto(result));
+                    moneyBefore, state.Wallet.Money, countBefore.Value, countBefore.Value + 1);
+                return ResultFactory.Success<GameplayFailure, ShopPurchaseDto>(new ShopPurchaseDto(result));
             }
-            catch (Exception ex)
-            {
-                return SystemFailure<ShopPurchaseDto>("gameplay.buy_seed", ex);
-            }
+            catch (Exception ex) { return SystemFailure<ShopPurchaseDto>("gameplay.buy_seed", ex); }
         }
 
-        OperationResult<ShopSellDto> SafeSellItem(GameState state, string itemId, int pricePerUnit, int count)
+        Result<GameplayFailure, ShopSellDto> SafeSellItem(GameState state, string itemId, int pricePerUnit, int count)
         {
             try
             {
-                if (state == null) return OperationResult<ShopSellDto>.Failed(FailureCode.NotInitialized, "game_state");
+                if (state == null)
+                    return ResultFactory.Failure<GameplayFailure, ShopSellDto>(GameplayFailure.NotInitialized("game_state"));
                 if (string.IsNullOrEmpty(itemId) || pricePerUnit < 0 || count <= 0)
-                    return OperationResult<ShopSellDto>.Failed(FailureCode.InvalidArgument, itemId);
+                    return ResultFactory.Failure<GameplayFailure, ShopSellDto>(GameplayFailure.InvalidArgument(itemId));
 
                 int moneyBefore = state.Wallet.Money;
-                var countBeforeResult = _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult();
-                if (!countBeforeResult.IsSuccess) return Propagate<ShopSellDto>(countBeforeResult, itemId);
-                int countBefore = countBeforeResult.Data;
-                if (countBefore < count)
-                    return OperationResult<ShopSellDto>.Failed(FailureCode.InsufficientInventory, itemId, count, countBefore);
+                var countBefore = _inventory.Count(state.InventorySystem, itemId).GetAwaiter().GetResult();
+                if (!countBefore.IsSuccess) return Propagate<ShopSellDto>(countBefore, itemId);
+                if (countBefore.Value < count)
+                    return ResultFactory.Failure<GameplayFailure, ShopSellDto>(GameplayFailure.InsufficientInventory(itemId, count, countBefore.Value));
 
                 var remove = _inventory.Remove(state.InventorySystem, itemId, count).GetAwaiter().GetResult();
                 if (!remove.IsSuccess) return Propagate<ShopSellDto>(remove, itemId);
@@ -109,13 +92,10 @@ namespace Prototype.Application
                 state.Wallet.Money += earned;
                 var result = new ShopSellResult(
                     ShopSellResultCode.Success, itemId, pricePerUnit, count, earned,
-                    moneyBefore, state.Wallet.Money, countBefore, countBefore - count);
-                return OperationResult<ShopSellDto>.Success(new ShopSellDto(result));
+                    moneyBefore, state.Wallet.Money, countBefore.Value, countBefore.Value - count);
+                return ResultFactory.Success<GameplayFailure, ShopSellDto>(new ShopSellDto(result));
             }
-            catch (Exception ex)
-            {
-                return SystemFailure<ShopSellDto>("gameplay.sell_item", ex);
-            }
+            catch (Exception ex) { return SystemFailure<ShopSellDto>("gameplay.sell_item", ex); }
         }
 
         ToolActionDto UseToolInternal(GameState state, ToolType tool, GridCoord coord)
@@ -140,7 +120,7 @@ namespace Prototype.Application
             var tile = state.Grid.GetTile(coord);
             if (!CanPlant(tile, out var failure)) return failure;
             var remove = _inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(crop)).GetAwaiter().GetResult();
-            if (!remove.IsSuccess) return Fail(MapInventoryFailure(remove.FailureCode, ToolResultCode.NoSeed));
+            if (!remove.IsSuccess) return Fail(MapInventoryFailure(remove.Failure.Code, ToolResultCode.NoSeed));
             tile.Crop = new CropInstance(crop);
             return Success(FeedbackKind.Plant);
         }
@@ -159,15 +139,17 @@ namespace Prototype.Application
             if (tile.Object == null || tile.Object.Type != TileObjectType.Tree || !tile.Object.IsAlive)
                 return Fail(ToolResultCode.NotChoppable);
             if (!Spend(state, BalanceConfig.ChopStaminaCost)) return Fail(ToolResultCode.NoStamina);
-            if (tile.Object.HP <= 1
-                && !_inventory.CanAdd(state.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult().IsSuccess)
-                return Fail(ToolResultCode.InventoryFull);
+            if (tile.Object.HP <= 1)
+            {
+                var canAdd = _inventory.CanAdd(state.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult();
+                if (!canAdd.IsSuccess) return Fail(MapInventoryFailure(canAdd.Failure.Code, ToolResultCode.InventoryFull));
+            }
 
             tile.Object.HP--;
             if (tile.Object.HP > 0) return Success(FeedbackKind.Chop);
             tile.Object.RespawnDaysLeft = TreeDefinition.RespawnDays;
             var add = _inventory.Add(state.InventorySystem, TreeDefinition.WoodItemId, TreeDefinition.WoodPerTree).GetAwaiter().GetResult();
-            if (!add.IsSuccess) return Fail(MapInventoryFailure(add.FailureCode, ToolResultCode.SystemError));
+            if (!add.IsSuccess) return Fail(MapInventoryFailure(add.Failure.Code, ToolResultCode.SystemError));
             return Success(FeedbackKind.Chop, TreeDefinition.WoodPerTree);
         }
 
@@ -175,8 +157,15 @@ namespace Prototype.Application
         {
             if (!CanPlant(tile, out var failure)) return failure;
             CropId? crop = null;
-            if (_inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Turnip)).GetAwaiter().GetResult().IsSuccess) crop = CropId.Turnip;
-            else if (_inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Potato)).GetAwaiter().GetResult().IsSuccess) crop = CropId.Potato;
+            var turnip = _inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Turnip)).GetAwaiter().GetResult();
+            if (turnip.IsSuccess) crop = CropId.Turnip;
+            else
+            {
+                var potato = _inventory.Remove(state.InventorySystem, CropDefinition.SeedItemId(CropId.Potato)).GetAwaiter().GetResult();
+                if (potato.IsSuccess) crop = CropId.Potato;
+                else if (turnip.Failure.Code == FailureCode.SystemError || potato.Failure.Code == FailureCode.SystemError)
+                    return Fail(ToolResultCode.SystemError);
+            }
             if (!crop.HasValue) return Fail(ToolResultCode.NoSeed);
             tile.Crop = new CropInstance(crop.Value);
             return Success(FeedbackKind.Plant);
@@ -196,9 +185,10 @@ namespace Prototype.Application
         {
             if (tile.Crop == null || !tile.Crop.IsRipe) return Fail(ToolResultCode.WrongTool);
             string itemId = CropDefinition.ProduceItemId(tile.Crop.Id);
-            if (!_inventory.CanAdd(state.InventorySystem, itemId).GetAwaiter().GetResult().IsSuccess) return Fail(ToolResultCode.InventoryFull);
+            var canAdd = _inventory.CanAdd(state.InventorySystem, itemId).GetAwaiter().GetResult();
+            if (!canAdd.IsSuccess) return Fail(MapInventoryFailure(canAdd.Failure.Code, ToolResultCode.InventoryFull));
             var add = _inventory.Add(state.InventorySystem, itemId).GetAwaiter().GetResult();
-            if (!add.IsSuccess) return Fail(MapInventoryFailure(add.FailureCode, ToolResultCode.SystemError));
+            if (!add.IsSuccess) return Fail(MapInventoryFailure(add.Failure.Code, ToolResultCode.SystemError));
             tile.Crop = null;
             return Success(FeedbackKind.Harvest, 1);
         }
@@ -218,10 +208,10 @@ namespace Prototype.Application
             return true;
         }
 
-        static OperationResult<ToolActionDto> ToToolResult(ToolActionDto dto, string context)
+        static Result<GameplayFailure, ToolActionDto> ToToolResult(ToolActionDto dto, string context)
             => dto.IsSuccess
-                ? OperationResult<ToolActionDto>.Success(dto)
-                : OperationResult<ToolActionDto>.Failed(MapFailure(dto.Code), context, data: dto);
+                ? ResultFactory.Success<GameplayFailure, ToolActionDto>(dto)
+                : ResultFactory.Failure<GameplayFailure, ToolActionDto>(GameplayFailure.Tool(MapFailure(dto.Code), context), dto);
 
         static FailureCode MapFailure(ToolResultCode code)
         {
@@ -251,16 +241,16 @@ namespace Prototype.Application
             }
         }
 
-        static OperationResult<T> Propagate<T>(OperationResult source, string context)
-            => OperationResult<T>.Failed(source.FailureCode, context, source.Error.Expected, source.Error.Actual);
+        static Result<GameplayFailure, TValue> Propagate<TValue>(Result<InventoryFailure, Unit> source, string context)
+            => ResultFactory.Failure<GameplayFailure, TValue>(GameplayFailure.FromInventory(source.Failure, context));
 
-        static OperationResult<T> Propagate<T>(OperationResult<int> source, string context)
-            => OperationResult<T>.Failed(source.FailureCode, context, source.Error.Expected, source.Error.Actual);
+        static Result<GameplayFailure, TValue> Propagate<TValue>(Result<InventoryFailure, int> source, string context)
+            => ResultFactory.Failure<GameplayFailure, TValue>(GameplayFailure.FromInventory(source.Failure, context));
 
-        static OperationResult<T> SystemFailure<T>(string context, Exception exception, T data = default(T))
+        static Result<GameplayFailure, TValue> SystemFailure<TValue>(string context, Exception exception, TValue data = default(TValue))
         {
             Debug.LogException(exception);
-            return OperationResult<T>.Failed(FailureCode.SystemError, context, data: data);
+            return ResultFactory.Failure<GameplayFailure, TValue>(GameplayFailure.System(context), data);
         }
 
         static ToolActionDto Success(FeedbackKind feedback, int amount = 0)

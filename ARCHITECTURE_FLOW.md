@@ -18,7 +18,7 @@ flowchart LR
     end
 
     Bootstrap[GameManager\ncomposition root] --> DI[Microsoft DI]
-    DI --> Infra[Infrastructure services\nUniTask + OperationResult + mapping]
+    DI --> Infra[Infrastructure services\nUniTask + typed Result + mapping]
     Infra --> State[Domain raw state]
 
     Input --> Player[PlayerController]
@@ -75,7 +75,7 @@ Prototype.Application
         │ calls Infrastructure only
         ▼
 Prototype.Infrastructure
-  InventoryService / UniTask + OperationResult implementations
+  InventoryService / UniTask + typed Result implementations
   ClockService / GameplayService / DialogueService
   GameStateApplicationService / repository adapters
   ArtCatalog / PlaceholderArt / SessionLogger
@@ -252,7 +252,7 @@ sequenceDiagram
     V->>D: BuySeed(crop)
     D->>W: validate and spend money
     D->>I: add seed when capacity allows
-    D-->>V: UniTask<OperationResult<ShopPurchaseDto>>
+    D-->>V: UniTask<Result<GameplayFailure, ShopPurchaseDto>>
     V->>V: show feedback and refresh price/owned count
 ```
 
@@ -290,7 +290,7 @@ scene-authored. Runtime code updates item images, counts and selection state.
 the concrete read projection used by the Application inventory UI. DI registers
 the same instance for both the concrete Infrastructure service and the Domain
 port; the Domain inventory remains the source of truth. Inventory mutations
-return `OperationResult`, so callers can distinguish `InventoryFull`,
+return `Result<InventoryFailure, TValue>`, so callers can distinguish `InventoryFull`,
 `InsufficientInventory`, `LockedSlot`, `NotInitialized` and `SystemError`
 without parsing UI text.
 

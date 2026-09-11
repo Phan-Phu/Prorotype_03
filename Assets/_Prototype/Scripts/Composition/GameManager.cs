@@ -69,20 +69,19 @@ namespace Prototype.Application
             services.AddSingleton(stateRepository);
             // Keep the application boundary explicit: domain state is mapped to DTOs once at the
             // composition root, then views consume the query/use-case interfaces.
-            var inventoryService = new InventoryService();
-            var inventoryQuery = new InventoryQuery(inventoryService, State.InventorySystem);
+            var inventoryService = new InventoryService(State.InventorySystem);
             var clockService = new ClockService();
             var gameplayService = new GameplayService(inventoryService);
             var dialogueService = new DialogueService();
             var worldService = new GameWorldService();
             _worldService = worldService;
-            var stateService = new GameStateApplicationService(State, inventoryQuery, clockService);
+            var stateService = new GameStateApplicationService(State, inventoryService, clockService);
             services.AddSingleton<Prototype.Domain.IInventoryService>(inventoryService);
             services.AddSingleton<IClockService>(clockService);
             services.AddSingleton<IGameplayService>(gameplayService);
             services.AddSingleton<IDialogueService>(dialogueService);
             services.AddSingleton<IGameWorldService>(worldService);
-            services.AddSingleton<IInventoryQuery>(inventoryQuery);
+            services.AddSingleton<IInventoryQuery>(inventoryService);
             services.AddSingleton<IGameStateQuery>(stateService);
             services.AddSingleton<IGameTimeUseCase>(stateService);
             _services = services.BuildServiceProvider(new ServiceProviderOptions

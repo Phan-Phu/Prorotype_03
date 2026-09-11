@@ -3,7 +3,6 @@ using Prototype.Domain;
 
 namespace Prototype.Application
 {
-    /// <summary>Infrastructure boundary for world queries and debug/runtime state mutations.</summary>
     public interface IGameWorldService
     {
         GridCoord SeedShopCoord(GameState state);

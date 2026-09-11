@@ -3,7 +3,6 @@ using UnityEngine;
 
 namespace Prototype.Application
 {
-    /// <summary>Application command for advancing simulation time.</summary>
     public readonly struct AdvanceTimeRequest
     {
         public readonly float DeltaSeconds;
@@ -14,7 +13,6 @@ namespace Prototype.Application
         }
     }
 
-    /// <summary>Read-only transport model for the clock; views do not need the domain GameClock.</summary>
     public readonly struct GameClockDto
     {
         public readonly int Day;
@@ -25,11 +23,10 @@ namespace Prototype.Application
         {
             Day = day;
             RawHour = rawHour;
-            DisplayHour = ClockService.WrapHour(rawHour);
+            DisplayHour = ((rawHour % 24) + 24) % 24;
         }
     }
 
-    /// <summary>Read-only application snapshot used by HUD and future presentation components.</summary>
     public sealed class GameStateSnapshotDto
     {
         public readonly GameClockDto Clock;
@@ -41,11 +38,8 @@ namespace Prototype.Application
         public GameStateSnapshotDto(GameClockDto clock, int money, int stamina,
             Vector2 playerPosition, InventorySnapshot inventory)
         {
-            Clock = clock;
-            Money = money;
-            Stamina = stamina;
-            PlayerPosition = playerPosition;
-            Inventory = inventory;
+            Clock = clock; Money = money; Stamina = stamina;
+            PlayerPosition = playerPosition; Inventory = inventory;
         }
     }
 

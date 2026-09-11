@@ -30,8 +30,8 @@ outside this repository.
   `Prototype.Domain`.
 - Inventory is grouped under `Domain/Inventory/`: raw entity, Domain service
   ports and inventory value objects. Its behavior implementation is under
-  `Infrastructure/Inventory/`; the read DTOs remain with the Infrastructure
-  query adapter.
+  `Infrastructure/Inventory/`; the UI query interface and read DTOs are under
+  `Application/Inventory`.
 - Infrastructure exposes UniTask async entry points (`ReadAsync`, `TickAsync`,
   `UseToolAsync`, `BuySeedAsync`, `SellItemAsync`, dialogue and debug async
   methods) so storage/MasterData can become asynchronous later.

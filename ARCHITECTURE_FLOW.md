@@ -58,6 +58,10 @@ Unity scene / Unity lifecycle
         │
         ▼
 Prototype.Application
+  Inventory/         IInventoryQuery, InventorySnapshot, InventorySlotData
+  Gameplay/          IGameplayService and action/shop DTOs
+  Dialogue/          IDialogueService and DialogueDto
+  State/             IClockService, IGameWorldService, state/time DTOs
   GameManager          composition root and runtime bootstrap
   PlayerController     input, movement, active-slot actions
   WorldView            world rendering
@@ -70,7 +74,7 @@ Prototype.Application
         │ calls Infrastructure only
         ▼
 Prototype.Infrastructure
-  InventoryService / InventoryQuery / DTOs / UniTask
+  InventoryService / UniTask implementations
   ClockService / GameplayService / DialogueService
   GameStateApplicationService / repository adapters
   ArtCatalog / PlaceholderArt / SessionLogger
@@ -88,10 +92,10 @@ Prototype.Domain
 ```
 
 Inventory is intentionally a Domain feature folder. `IInventoryService` is a
-Domain port containing only raw inventory operations; the implementation is
-`Infrastructure/Inventory/InventoryService`. `InventorySnapshot` and
-`InventorySlotData` are read DTOs, so they stay beside the Infrastructure query
-adapter rather than inside Domain.
+Domain port containing raw sync and UniTask inventory operations; the
+implementation is `Infrastructure/Inventory/InventoryService`. The same
+Infrastructure class implements the UI-facing `Application/Inventory/IInventoryQuery`
+read contract and projects `InventorySnapshot`/`InventorySlotData`.
 
 `Presentation` has been merged into `Application`. Feature actions call
 Infrastructure services and consume their DTOs. Domain contains no DTOs. The
@@ -268,15 +272,16 @@ Infrastructure InventoryService
         │                              └─ InventorySnapshot / InventorySlotData
         │                                  → ToolbarCanvasUI
         │
-        ├─ InventoryQuery → InventoryScreenUI
+        ├─ IInventoryQuery projection → InventoryScreenUI
         │
         └─ active slot → PlayerController action resolution
 ```
 
 The toolbar background, slot objects, anchors and responsive canvas are
 scene-authored. Runtime code updates item images, counts and selection state.
-`InventoryQuery` exists as the read-side adapter registered by DI; the domain
-inventory remains the source of truth.
+`InventoryService` implements the Application `IInventoryQuery` projection and
+the Domain `IInventoryService` port. DI registers the same instance for both;
+the Domain inventory remains the source of truth.
 
 ## 7. NPC dialogue flow
 

@@ -6,9 +6,9 @@ namespace Prototype.Application
     /// <summary>Infrastructure implementation for tool, shop and economy behavior.</summary>
     public sealed class GameplayService : IGameplayService
     {
-        readonly IInventoryService _inventory;
+        readonly Prototype.Domain.IInventoryService _inventory;
 
-        public GameplayService(IInventoryService inventory) => _inventory = inventory;
+        public GameplayService(Prototype.Domain.IInventoryService inventory) => _inventory = inventory;
 
         public ToolActionDto UseTool(GameState state, ToolType tool, GridCoord coord)
         {

@@ -28,6 +28,10 @@ outside this repository.
   own inventory, clock, farming/economy, dialogue and world/debug behavior.
   The namespace is intentionally limited to `Prototype.Application` or
   `Prototype.Domain`.
+- Inventory is grouped under `Domain/Inventory/`: raw entity, Domain service
+  ports and inventory value objects. Its behavior implementation is under
+  `Infrastructure/Inventory/`; the read DTOs remain with the Infrastructure
+  query adapter.
 - Infrastructure exposes UniTask async entry points (`ReadAsync`, `TickAsync`,
   `UseToolAsync`, `BuySeedAsync`, `SellItemAsync`, dialogue and debug async
   methods) so storage/MasterData can become asynchronous later.

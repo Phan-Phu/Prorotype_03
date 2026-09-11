@@ -77,7 +77,7 @@ namespace Prototype.Application
             var worldService = new GameWorldService();
             _worldService = worldService;
             var stateService = new GameStateApplicationService(State, inventoryQuery, clockService);
-            services.AddSingleton<IInventoryService>(inventoryService);
+            services.AddSingleton<Prototype.Domain.IInventoryService>(inventoryService);
             services.AddSingleton<IClockService>(clockService);
             services.AddSingleton<IGameplayService>(gameplayService);
             services.AddSingleton<IDialogueService>(dialogueService);
@@ -239,7 +239,7 @@ namespace Prototype.Application
                 inv = go.AddComponent<InventoryScreenUI>();
             }
             inv.State = State;
-            inv.InventoryService = _services.GetRequiredService<IInventoryService>();
+            inv.InventoryService = _services.GetRequiredService<Prototype.Domain.IInventoryService>();
             inv.InventoryQuery = _services.GetRequiredService<IInventoryQuery>();
             inv.Player = _player;
         }
@@ -266,7 +266,7 @@ namespace Prototype.Application
             }
             shop.State = State;
             shop.GameplayService = _services.GetRequiredService<IGameplayService>();
-            shop.InventoryService = _services.GetRequiredService<IInventoryService>();
+            shop.InventoryService = _services.GetRequiredService<Prototype.Domain.IInventoryService>();
             shop.Player = _player;
         }
 
@@ -293,7 +293,7 @@ namespace Prototype.Application
             }
             _debug.State = State;
             _debug.ClockService = _services.GetRequiredService<IClockService>();
-            _debug.InventoryService = _services.GetRequiredService<IInventoryService>();
+            _debug.InventoryService = _services.GetRequiredService<Prototype.Domain.IInventoryService>();
             _debug.GameplayService = _services.GetRequiredService<IGameplayService>();
             _debug.WorldService = _worldService;
             _debug.Player = _player;

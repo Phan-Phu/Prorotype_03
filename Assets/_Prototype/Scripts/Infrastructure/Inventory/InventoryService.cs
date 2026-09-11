@@ -4,10 +4,10 @@ using Prototype.Domain;
 namespace Prototype.Application
 {
     /// <summary>
-    /// Inventory behavior and DTO projection. UniTask is used at the application boundary so the
-    /// same service can later read from MasterData/save storage without changing UI callers.
+    /// Infrastructure implementation of the Domain inventory port. DTO projection is exposed
+    /// separately to the Application read side through InventoryQuery.
     /// </summary>
-    public sealed class InventoryService : IInventoryService
+    public sealed class InventoryService : Prototype.Domain.IInventoryService
     {
         public InventorySnapshot Read(Inventory inventory)
         {

@@ -6,10 +6,10 @@ namespace Prototype.Application
     /// <summary>Application read adapter over Infrastructure inventory projection.</summary>
     public sealed class InventoryQuery : Prototype.Application.IInventoryQuery
     {
-        readonly IInventoryService _service;
+        readonly Prototype.Domain.IInventoryService _service;
         readonly Prototype.Domain.Inventory _inventory;
 
-        public InventoryQuery(IInventoryService service, Prototype.Domain.Inventory inventory)
+        public InventoryQuery(Prototype.Domain.IInventoryService service, Prototype.Domain.Inventory inventory)
         {
             _service = service;
             _inventory = inventory;

@@ -12,6 +12,7 @@ namespace Prototype.Domain
             Count = count;
         }
 
+        // Mutation is intentionally small and is called by Infrastructure services only.
         public void Add(int amount) => Count += amount;
         public void Remove(int amount) => Count -= amount;
     }

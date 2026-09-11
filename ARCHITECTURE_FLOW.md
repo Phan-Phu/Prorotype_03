@@ -78,12 +78,20 @@ Prototype.Infrastructure
         │ reads and mutates raw models through ports
         ▼
 Prototype.Domain
-  Entities/      GameState, GridMap, TileData, CropInstance,
-                 Inventory, Wallet, Stamina, GameClock, NPC state
-  ValueObjects/  GridCoord, ItemStack, tool result/value types
+  Inventory/    Entities/Inventory, Services/IInventoryService and
+                IInventoryReader, ValueObjects/ItemStack
+  Entities/     GameState, GridMap, TileData, CropInstance,
+                Wallet, Stamina, GameClock, NPC state
+  ValueObjects/ GridCoord, tool result/value types
   Policies/      BalanceConfig, crop/tree definitions
-  Ports/         IGameStateRepository, IInventoryReader
+  Ports/         IGameStateRepository
 ```
+
+Inventory is intentionally a Domain feature folder. `IInventoryService` is a
+Domain port containing only raw inventory operations; the implementation is
+`Infrastructure/Inventory/InventoryService`. `InventorySnapshot` and
+`InventorySlotData` are read DTOs, so they stay beside the Infrastructure query
+adapter rather than inside Domain.
 
 `Presentation` has been merged into `Application`. Feature actions call
 Infrastructure services and consume their DTOs. Domain contains no DTOs. The

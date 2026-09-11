@@ -1,13 +1,11 @@
-using Cysharp.Threading.Tasks;
-using Prototype.Domain;
-
-namespace Prototype.Application
+namespace Prototype.Domain
 {
-    /// <summary>Infrastructure port consumed by Application; Domain remains a raw inventory model.</summary>
+    /// <summary>
+    /// Domain port for inventory operations. Infrastructure implements the behavior;
+    /// Domain only defines the contract over raw Inventory state.
+    /// </summary>
     public interface IInventoryService
     {
-        InventorySnapshot Read(Inventory inventory);
-        UniTask<InventorySnapshot> ReadAsync(Inventory inventory);
         bool Add(Inventory inventory, string itemId, int amount = 1);
         bool Remove(Inventory inventory, string itemId, int amount = 1);
         bool CanAdd(Inventory inventory, string itemId);

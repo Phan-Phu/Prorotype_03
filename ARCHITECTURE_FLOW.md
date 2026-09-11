@@ -59,6 +59,8 @@ Unity scene / Unity lifecycle
         ▼
 Prototype.Application
   GameManager          composition root and runtime bootstrap
+  GameStateApplicationService
+                       DTO mapping and time use case boundary
   PlayerController     input, movement, active-slot actions
   WorldView            world rendering
   HUD                 HUD rendering
@@ -98,28 +100,37 @@ sequenceDiagram
     participant G as GameManager
     participant S as GameState
     participant D as Microsoft DI
+    participant A as GameStateApplicationService
     participant C as Application components
 
     U->>G: AfterSceneLoad bootstrap
     G->>S: new GameState(BootArgs.Seed)
     G->>S: apply start day and start money
     G->>D: register IInventoryReader and IInventoryQuery
+    G->>A: register state query and time use case
     G->>C: find or create camera/world/player/HUD/UI/NPC/debug
-    G->>C: assign State and Player references
+    G->>C: assign State, DTO query and Player references
     loop every frame
-        G->>S: GameClock.Tick(deltaTime)
+        G->>A: Advance(AdvanceTimeRequest)
+        A->>S: GameClock.Tick(deltaTime)
+        A-->>C: GameStateSnapshotDto
     end
 ```
 
 `GameManager` is the actual composition root. It creates the domain state,
-builds the Microsoft DI service provider, then wires the MonoBehaviours. It
-does not use a separate application handler layer yet.
+builds the Microsoft DI service provider, then wires the MonoBehaviours. The
+shared time/read boundary is `GameStateApplicationService`; feature-specific
+controllers still call the domain action methods directly until those use
+cases need their own application services.
 
 Important bootstrap behavior:
 
 - `Prototype_Main.unity` contains the main camera and authored UI canvas roots.
 - `ToolbarCanvasUI` is found in the scene and bound to `Player` and
   `IInventoryQuery`; the toolbar is not created by `GameManager`.
+- `GameStateApplicationService` maps mutable domain state into
+  `GameStateSnapshotDto`. HUD time rendering consumes `IGameStateQuery` and
+  does not read `GameClock` or create fallback IMGUI controls.
 - Missing runtime components such as `PlayerController`, `HUD`,
   `InventoryScreenUI`, `SeedShopUI`, NPC and debug components are created by
   `GameManager` when absent.
@@ -237,8 +248,10 @@ inventory: it validates before changing wallet or inventory.
 ```text
 GameState.InventorySystem
         │
-        ├─ InventoryQuery → InventorySnapshot / InventorySlotData
-        │                    → ToolbarCanvasUI (scene-authored UGUI)
+        ├─ GameStateApplicationService → GameStateSnapshotDto
+        │                              ├─ GameClockDto → HUD
+        │                              └─ InventorySnapshot / InventorySlotData
+        │                                  → ToolbarCanvasUI
         │
         ├─ direct state read → HUD / InventoryScreenUI
         │

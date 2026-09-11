@@ -18,6 +18,7 @@ namespace Prototype.Application
 
         private PlayerController _player;
         private DebugPanel _debug;
+        private IGameTimeUseCase _timeUseCase;
         // Keep Unity coupled to the DI abstraction. The concrete Microsoft provider stays
         // inside this composition root, which makes the rest of the game portable and avoids
         // relying on provider-specific APIs during domain/application execution.
@@ -62,16 +63,19 @@ namespace Prototype.Application
         {
             var services = new ServiceCollection();
             services.AddSingleton<Prototype.Domain.IInventoryReader>(State.InventorySystem);
-            // Use an explicit factory instead of constructor discovery. This is more reliable
-            // under Unity's managed assembly loader and makes the application dependency graph
-            // visible at the composition root.
-            services.AddSingleton<IInventoryQuery>(sp =>
-                new InventoryQuery(sp.GetRequiredService<Prototype.Domain.IInventoryReader>()));
+            // Keep the application boundary explicit: domain state is mapped to DTOs once at the
+            // composition root, then views consume the query/use-case interfaces.
+            var inventoryQuery = new InventoryQuery(State.InventorySystem);
+            var stateService = new GameStateApplicationService(State, inventoryQuery);
+            services.AddSingleton<IInventoryQuery>(inventoryQuery);
+            services.AddSingleton<IGameStateQuery>(stateService);
+            services.AddSingleton<IGameTimeUseCase>(stateService);
             _services = services.BuildServiceProvider(new ServiceProviderOptions
             {
                 ValidateScopes = true,
                 ValidateOnBuild = true
             });
+            _timeUseCase = _services.GetRequiredService<IGameTimeUseCase>();
         }
 
         void OnDestroy()
@@ -85,7 +89,7 @@ namespace Prototype.Application
         {
             if (State == null) return;
             float dt = Time.deltaTime * (Prototype.Application.BootArgs.FastTime ? 10f : 1f);
-            State.Clock.Tick(dt);
+            _timeUseCase?.Advance(new AdvanceTimeRequest(dt));
         }
 
         void SetupCamera()
@@ -194,7 +198,7 @@ namespace Prototype.Application
                 var go = new GameObject("HUD");
                 hud = go.AddComponent<HUD>();
             }
-            hud.State = State;
+            hud.StateQuery = _services.GetRequiredService<IGameStateQuery>();
             hud.Player = _player;
         }
 

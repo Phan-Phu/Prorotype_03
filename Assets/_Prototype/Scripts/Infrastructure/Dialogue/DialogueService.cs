@@ -1,38 +1,69 @@
+using System;
 using Cysharp.Threading.Tasks;
+using Prototype.Application;
 using Prototype.Domain;
 
-namespace Prototype.Application
+namespace Prototype.Infrastructure
 {
-    /// <summary>Infrastructure state adapter for the dialogue interaction flow.</summary>
+    /// <summary>Infrastructure implementation of the NPC dialogue port.</summary>
     public sealed class DialogueService : IDialogueService
     {
         readonly DialogueState _state = new DialogueState();
 
-        public DialogueDto Read() => ToDto();
+        public UniTask<Result<DialogueFailure, DialogueDto>> Read()
+            => Safe("dialogue.read", ToDto);
 
-        public DialogueDto Open(NpcDefinition npc)
+        public UniTask<Result<DialogueFailure, DialogueDto>> Open(NpcDefinition npc)
         {
-            _state.Open(npc);
-            return ToDto();
+            if (npc == null || npc.Lines == null || npc.Lines.Length == 0)
+                return ResultFactory.UniTaskFailure<DialogueFailure, DialogueDto>(DialogueFailure.InvalidNpc());
+            return Safe("dialogue.open", () =>
+            {
+                _state.ActiveNpc = npc;
+                _state.LineIndex = 0;
+                return ToDto();
+            });
         }
 
-        public DialogueDto AdvanceOrClose()
+        public UniTask<Result<DialogueFailure, DialogueDto>> AdvanceOrClose()
         {
-            _state.AdvanceOrClose();
-            return ToDto();
+            if (!_state.IsOpen)
+                return ResultFactory.UniTaskFailure<DialogueFailure, DialogueDto>(DialogueFailure.NoActiveDialogue());
+            return Safe("dialogue.advance", () =>
+            {
+                if (_state.LineIndex + 1 >= _state.ActiveNpc.Lines.Length)
+                {
+                    _state.ActiveNpc = null;
+                    _state.LineIndex = 0;
+                }
+                else
+                {
+                    _state.LineIndex++;
+                }
+                return ToDto();
+            });
         }
 
-        public DialogueDto Close()
+        public UniTask<Result<DialogueFailure, DialogueDto>> Close()
+            => Safe("dialogue.close", () =>
+            {
+                _state.ActiveNpc = null;
+                _state.LineIndex = 0;
+                return ToDto();
+            });
+
+        async UniTask<Result<DialogueFailure, DialogueDto>> Safe(string context, Func<DialogueDto> operation)
         {
-            _state.Close();
-            return ToDto();
+            try
+            {
+                return ResultFactory.Success<DialogueFailure, DialogueDto>(operation());
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogException(exception);
+                return ResultFactory.Failure<DialogueFailure, DialogueDto>(DialogueFailure.System(context));
+            }
         }
-
-        public UniTask<DialogueDto> OpenAsync(NpcDefinition npc)
-            => UniTask.FromResult(Open(npc));
-
-        public UniTask<DialogueDto> AdvanceOrCloseAsync()
-            => UniTask.FromResult(AdvanceOrClose());
 
         DialogueDto ToDto()
         {

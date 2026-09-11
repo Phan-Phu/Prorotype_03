@@ -1,38 +1,65 @@
+using System;
+using Cysharp.Threading.Tasks;
+using Prototype.Application;
 using Prototype.Domain;
 
-namespace Prototype.Application
+namespace Prototype.Infrastructure
 {
-    /// <summary>
-    /// Application boundary for simulation time and state reads. Domain owns the rules; this service
-    /// owns the DTO mapping so Unity views do not depend on mutable domain aggregates.
-    /// </summary>
+    /// <summary>Maps infrastructure/domain state into application-facing snapshots.</summary>
     public sealed class GameStateApplicationService : IGameStateQuery, IGameTimeUseCase
     {
         readonly GameState _state;
         readonly InventoryService _inventoryService;
         readonly IClockService _clockService;
 
-        public GameStateApplicationService(GameState state, InventoryService inventoryService, IClockService clockService)
+        public GameStateApplicationService(GameState state, InventoryService inventoryService,
+            IClockService clockService)
         {
             _state = state;
             _inventoryService = inventoryService;
             _clockService = clockService;
         }
 
-        public GameStateSnapshotDto Read() => ToSnapshot();
+        public UniTask<Result<StateFailure, GameStateSnapshotDto>> Read()
+            => BuildSnapshot("state.read");
 
-        public GameStateSnapshotDto Advance(AdvanceTimeRequest request)
+        public UniTask<Result<StateFailure, GameStateSnapshotDto>> Advance(AdvanceTimeRequest request)
         {
-            _clockService.Tick(_state, request.DeltaSeconds);
-            return ToSnapshot();
+            if (_state == null)
+                return ResultFactory.UniTaskFailure<StateFailure, GameStateSnapshotDto>(StateFailure.NotInitialized());
+            return AdvanceInternal(request);
         }
 
-        GameStateSnapshotDto ToSnapshot()
-            => new GameStateSnapshotDto(
-                _clockService.Read(_state),
-                _state.Wallet.Money,
-                _state.Stamina.Current,
-                _state.PlayerPosition,
-                _inventoryService.Read(_state.InventorySystem));
+        async UniTask<Result<StateFailure, GameStateSnapshotDto>> AdvanceInternal(AdvanceTimeRequest request)
+        {
+            var clock = await _clockService.Tick(_state, request.DeltaSeconds);
+            if (!clock.IsSuccess)
+                return ResultFactory.Failure<StateFailure, GameStateSnapshotDto>(StateFailure.FromClock(clock.Failure));
+            return await BuildSnapshot("state.advance");
+        }
+
+        async UniTask<Result<StateFailure, GameStateSnapshotDto>> BuildSnapshot(string context)
+        {
+            if (_state == null || _state.Wallet == null || _state.Stamina == null || _state.InventorySystem == null)
+                return ResultFactory.Failure<StateFailure, GameStateSnapshotDto>(StateFailure.NotInitialized(context));
+            try
+            {
+                var clock = await _clockService.Read(_state);
+                if (!clock.IsSuccess)
+                    return ResultFactory.Failure<StateFailure, GameStateSnapshotDto>(StateFailure.FromClock(clock.Failure));
+                return ResultFactory.Success<StateFailure, GameStateSnapshotDto>(
+                    new GameStateSnapshotDto(
+                        clock.Value,
+                        _state.Wallet.Money,
+                        _state.Stamina.Current,
+                        _state.PlayerPosition,
+                        _inventoryService.Read(_state.InventorySystem)));
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogException(exception);
+                return ResultFactory.Failure<StateFailure, GameStateSnapshotDto>(StateFailure.System(context));
+            }
+        }
     }
 }

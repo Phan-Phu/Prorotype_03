@@ -27,8 +27,8 @@ outside this repository.
   consumes Infrastructure services/DTOs.
 - Infrastructure implementations live under `Scripts/Infrastructure/` and
   own inventory, clock, farming/economy, dialogue and world/debug behavior.
-  The namespace is intentionally limited to `Prototype.Application` or
-  `Prototype.Domain`.
+  Their namespace is `Prototype.Infrastructure`; Application only consumes
+  their contracts and typed results.
 - Inventory is grouped under `Domain/Inventory/`: raw entity, Domain service
   ports and inventory value objects. Its behavior implementation is under
   `Infrastructure/Inventory/`; the UI query interface and slot read data are
@@ -48,7 +48,7 @@ outside this repository.
   `SystemError`.
 - Infrastructure exposes UniTask operations directly; success and failure are
   returned through `Result<TFailure, TValue>` instead of duplicate sync/`*Async`
-  methods for Inventory and Gameplay.
+  methods for Inventory, Gameplay, NPC dialogue, clock, world and persistence.
 - UI is UGUI-based. Scene-authored objects provide the layout; application
   components bind state and user intent at runtime.
 - The main scene owns the authored canvas and toolbar hierarchy.

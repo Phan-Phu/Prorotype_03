@@ -1,64 +1,109 @@
+using System;
 using Cysharp.Threading.Tasks;
+using Prototype.Application;
 using Prototype.Domain;
 
-namespace Prototype.Application
+namespace Prototype.Infrastructure
 {
-    /// <summary>Owns world-level runtime/debug behavior outside raw Domain entities.</summary>
+    /// <summary>Infrastructure implementation of world queries and debug mutations.</summary>
     public sealed class GameWorldService : IGameWorldService
     {
-        public GridCoord SeedShopCoord(GameState state)
-            => new GridCoord(System.Math.Max(0, state.Grid.Width / 2 - 4), state.Grid.Height - 1);
-
-        public bool IsSeedShopTile(GameState state, GridCoord coord)
-            => state != null && coord.Equals(SeedShopCoord(state));
-
-        public void SetMoney(GameState state, int amount)
+        public UniTask<Result<WorldFailure, GridCoord>> SeedShopCoord(GameState state)
         {
-            if (state != null && state.Wallet != null) state.Wallet.Money = amount;
+            if (state?.Grid == null)
+                return ResultFactory.UniTaskFailure<WorldFailure, GridCoord>(WorldFailure.NotInitialized());
+            return ResultFactory.UniTaskSuccess<WorldFailure, GridCoord>(
+                new GridCoord(Math.Max(0, state.Grid.Width / 2 - 4), state.Grid.Height - 1));
         }
 
-        public void RefillStamina(GameState state)
+        public UniTask<Result<WorldFailure, bool>> IsSeedShopTile(GameState state, GridCoord coord)
         {
-            if (state != null && state.Stamina != null) state.Stamina.Current = state.Stamina.Max;
+            if (state?.Grid == null)
+                return ResultFactory.UniTaskFailure<WorldFailure, bool>(WorldFailure.NotInitialized());
+            var shopCoord = new GridCoord(Math.Max(0, state.Grid.Width / 2 - 4), state.Grid.Height - 1);
+            return ResultFactory.UniTaskSuccess<WorldFailure, bool>(coord.Equals(shopCoord));
         }
 
-        public bool DebugSpawnTree(GameState state, GridCoord coord)
+        public UniTask<Result<WorldFailure, Unit>> SetMoney(GameState state, int amount)
         {
-            if (state == null) return false;
-            var tile = state.Grid.GetTile(coord);
-            if (tile == null || tile.Type != TileType.Grass || tile.Object != null) return false;
-            tile.Object = TileObject.NewTree();
-            return true;
+            if (state?.Wallet == null)
+                return ResultFactory.UniTaskFailure<WorldFailure>(WorldFailure.NotInitialized("wallet"));
+            if (amount < 0)
+                return ResultFactory.UniTaskFailure<WorldFailure>(WorldFailure.InvalidArgument("money"));
+            return Safe("world.set_money", () => state.Wallet.Money = amount);
         }
 
-        public void ForceRespawnTrees(GameState state)
+        public UniTask<Result<WorldFailure, Unit>> RefillStamina(GameState state)
         {
-            if (state == null) return;
-            foreach (var tile in state.Grid.AllTiles())
-                if (tile.Object != null && !tile.Object.IsAlive)
-                {
-                    tile.Object.HP = TreeDefinition.MaxHP;
-                    tile.Object.RespawnDaysLeft = 0;
-                }
+            if (state?.Stamina == null)
+                return ResultFactory.UniTaskFailure<WorldFailure>(WorldFailure.NotInitialized("stamina"));
+            return Safe("world.refill_stamina", () => state.Stamina.Current = state.Stamina.Max);
         }
 
-        public void ForceRipeAll(GameState state)
+        public UniTask<Result<WorldFailure, bool>> DebugSpawnTree(GameState state, GridCoord coord)
         {
-            if (state == null) return;
-            foreach (var tile in state.Grid.AllTiles())
-                if (tile.Crop != null) tile.Crop.DaysGrown = CropDefinition.GrowthDays(tile.Crop.Id);
+            if (state?.Grid == null)
+                return ResultFactory.UniTaskFailure<WorldFailure, bool>(WorldFailure.NotInitialized());
+            return SafeBool("world.spawn_tree", () =>
+            {
+                var tile = state.Grid.GetTile(coord);
+                if (tile == null || tile.Type != TileType.Grass || tile.Object != null) return false;
+                tile.Object = TileObject.NewTree();
+                return true;
+            });
         }
 
-        public UniTask ForceRespawnTreesAsync(GameState state)
+        public UniTask<Result<WorldFailure, Unit>> ForceRespawnTrees(GameState state)
         {
-            ForceRespawnTrees(state);
-            return UniTask.CompletedTask;
+            if (state?.Grid == null)
+                return ResultFactory.UniTaskFailure<WorldFailure>(WorldFailure.NotInitialized());
+            return Safe("world.respawn_trees", () =>
+            {
+                foreach (var tile in state.Grid.AllTiles())
+                    if (tile.Object != null && !tile.Object.IsAlive)
+                    {
+                        tile.Object.HP = TreeDefinition.MaxHP;
+                        tile.Object.RespawnDaysLeft = 0;
+                    }
+            });
         }
 
-        public UniTask ForceRipeAllAsync(GameState state)
+        public UniTask<Result<WorldFailure, Unit>> ForceRipeAll(GameState state)
         {
-            ForceRipeAll(state);
-            return UniTask.CompletedTask;
+            if (state?.Grid == null)
+                return ResultFactory.UniTaskFailure<WorldFailure>(WorldFailure.NotInitialized());
+            return Safe("world.ripe_all", () =>
+            {
+                foreach (var tile in state.Grid.AllTiles())
+                    if (tile.Crop != null) tile.Crop.DaysGrown = CropDefinition.GrowthDays(tile.Crop.Id);
+            });
+        }
+
+        static UniTask<Result<WorldFailure, Unit>> Safe(string context, Action operation)
+        {
+            try
+            {
+                operation();
+                return ResultFactory.UniTaskSuccess<WorldFailure, Unit>(Unit.Value);
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogException(exception);
+                return ResultFactory.UniTaskFailure<WorldFailure>(WorldFailure.System(context));
+            }
+        }
+
+        static UniTask<Result<WorldFailure, bool>> SafeBool(string context, Func<bool> operation)
+        {
+            try
+            {
+                return ResultFactory.UniTaskSuccess<WorldFailure, bool>(operation());
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogException(exception);
+                return ResultFactory.UniTaskFailure<WorldFailure, bool>(WorldFailure.System(context));
+            }
         }
     }
 }

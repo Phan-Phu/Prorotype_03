@@ -1,5 +1,6 @@
 using Prototype.Application;
 using Prototype.Domain;
+using Prototype.Infrastructure;
 using UnityEngine;
 using Microsoft.Extensions.DependencyInjection;
 using System;
@@ -45,7 +46,13 @@ namespace Prototype.Application
             // Load the aggregate through the Domain repository port. Infrastructure owns the
             // storage adapter; GameState itself remains a Domain entity.
             _stateRepository = new InMemoryGameStateRepository();
-            State = _stateRepository.Load(20, 20, Prototype.Application.BootArgs.Seed);
+            var load = _stateRepository.Load(20, 20, Prototype.Application.BootArgs.Seed).GetAwaiter().GetResult();
+            if (!load.IsSuccess)
+            {
+                Debug.LogError($"Could not load game state: {load.Failure.Message}");
+                return;
+            }
+            State = load.Value;
             State.Clock.Day = Mathf.Max(1, Prototype.Application.BootArgs.StartDay);
             State.Wallet.Money = Prototype.Application.BootArgs.StartMoney;
 
@@ -253,7 +260,13 @@ namespace Prototype.Application
             sr.color = PlaceholderArt.ItemIcon(turnipSeed) != null
                 ? PlaceholderArt.ItemTint(turnipSeed)
                 : new Color(0.95f, 0.8f, 0.2f);
-            sr.transform.position = State.Grid.GridToWorld(_worldService.SeedShopCoord(State));
+            var shopCoord = _worldService.SeedShopCoord(State).GetAwaiter().GetResult();
+            if (!shopCoord.IsSuccess)
+            {
+                Debug.LogError($"Could not resolve seed shop position: {shopCoord.Failure.Message}");
+                return;
+            }
+            sr.transform.position = State.Grid.GridToWorld(shopCoord.Value);
             sr.transform.localScale = new Vector3(0.8f, 0.8f, 1f);
             sr.sortingOrder = 4;
 

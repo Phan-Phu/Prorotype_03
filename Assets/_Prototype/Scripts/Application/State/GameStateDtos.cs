@@ -1,3 +1,4 @@
+using Cysharp.Threading.Tasks;
 using Prototype.Domain;
 using UnityEngine;
 
@@ -45,11 +46,11 @@ namespace Prototype.Application
 
     public interface IGameStateQuery
     {
-        GameStateSnapshotDto Read();
+        UniTask<Result<StateFailure, GameStateSnapshotDto>> Read();
     }
 
     public interface IGameTimeUseCase
     {
-        GameStateSnapshotDto Advance(AdvanceTimeRequest request);
+        UniTask<Result<StateFailure, GameStateSnapshotDto>> Advance(AdvanceTimeRequest request);
     }
 }

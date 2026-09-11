@@ -1,9 +1,10 @@
 using System;
 using Cysharp.Threading.Tasks;
+using Prototype.Application;
 using Prototype.Domain;
 using UnityEngine;
 
-namespace Prototype.Application
+namespace Prototype.Infrastructure
 {
     /// <summary>
     /// Infrastructure implementation for tool, shop and economy behavior. Public operations are

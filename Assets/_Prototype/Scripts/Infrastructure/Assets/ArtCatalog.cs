@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Prototype.Application
+namespace Prototype.Infrastructure
 {
     /// <summary>
     /// Real pixel-art sprite references, baked once (Editor-only) by

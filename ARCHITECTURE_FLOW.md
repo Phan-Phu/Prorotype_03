@@ -132,7 +132,7 @@ sequenceDiagram
     G->>C: find or create camera/world/player/HUD/UI/NPC/debug
     G->>C: assign State, DTO query and Player references
     loop every frame
-        G->>I: TickAsync / DTO query
+        G->>I: Tick / typed UniTask result
         I->>S: update raw state
         I-->>C: GameStateSnapshotDto / feature DTO
     end
@@ -329,9 +329,8 @@ GameState / actions
 SessionLogger → local Artifacts/session_<seed>.csv
 ```
 
-`ArtCatalog` and `SessionLogger` are currently in the `Prototype.Application`
-namespace even though their folders identify them as infrastructure adapters.
-They are not domain rules.
+`ArtCatalog` and `SessionLogger` are infrastructure adapters in the
+`Prototype.Infrastructure` namespace. They are not domain rules.
 
 ## 9. Testing and current boundary
 

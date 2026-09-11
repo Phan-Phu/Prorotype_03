@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Prototype.Domain;
+using Prototype.Infrastructure;
 
 namespace Prototype.Application
 {

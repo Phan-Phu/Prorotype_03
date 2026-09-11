@@ -252,7 +252,13 @@ namespace Prototype.Application
             if (SeedShopUI.IsOpen) return;
 
             GridCoord coord = TargetCoord();
-            if (WorldService != null && WorldService.IsSeedShopTile(State, coord))
+            bool isShopTile = false;
+            if (WorldService != null)
+            {
+                var shopTile = WorldService.IsSeedShopTile(State, coord).GetAwaiter().GetResult();
+                isShopTile = shopTile.IsSuccess && shopTile.Value;
+            }
+            if (isShopTile)
             {
                 SeedShopUI.OpenCurrent();
                 GameManager.SpawnFeedback(coord, FeedbackKind.Plant);
@@ -266,7 +272,7 @@ namespace Prototype.Application
             GameManager.SpawnFeedback(coord, result.Feedback);
             // S2-QA-06: every real tool-use in a live session gets a row in Artifacts/session_<seed>.csv
             // — not fired by HeadlessSim or EditMode tests, only real Editor Play / packaged-build input.
-            Prototype.Application.SessionLogger.LogAction(State, slot?.ItemId ?? "(empty)", coord, result.Code.ToString());
+            Prototype.Infrastructure.SessionLogger.LogAction(State, slot?.ItemId ?? "(empty)", coord, result.Code.ToString());
         }
 
         /// <summary>Maps the active slot's item id to the action it performs. Empty/unrecognised slot = a no-op miss (WrongTool), same as any other invalid tool-use.</summary>

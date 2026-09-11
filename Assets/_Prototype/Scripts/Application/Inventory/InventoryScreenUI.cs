@@ -1,5 +1,6 @@
 using Prototype.Application;
 using Prototype.Domain;
+using Prototype.Infrastructure;
 using UnityEngine;
 
 namespace Prototype.Application

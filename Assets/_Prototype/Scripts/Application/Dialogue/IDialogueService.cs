@@ -20,11 +20,9 @@ namespace Prototype.Application
 
     public interface IDialogueService
     {
-        DialogueDto Read();
-        DialogueDto Open(NpcDefinition npc);
-        DialogueDto AdvanceOrClose();
-        DialogueDto Close();
-        UniTask<DialogueDto> OpenAsync(NpcDefinition npc);
-        UniTask<DialogueDto> AdvanceOrCloseAsync();
+        UniTask<Result<DialogueFailure, DialogueDto>> Read();
+        UniTask<Result<DialogueFailure, DialogueDto>> Open(NpcDefinition npc);
+        UniTask<Result<DialogueFailure, DialogueDto>> AdvanceOrClose();
+        UniTask<Result<DialogueFailure, DialogueDto>> Close();
     }
 }

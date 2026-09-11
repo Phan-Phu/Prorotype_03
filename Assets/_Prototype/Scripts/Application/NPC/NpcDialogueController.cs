@@ -22,7 +22,7 @@ namespace Prototype.Application
         private Text _dialogueText;
         private Text _advanceText;
 
-        public bool IsDialogueOpen => DialogueService != null && DialogueService.Read().IsOpen;
+        public bool IsDialogueOpen => ReadDialogue()?.IsOpen == true;
 
         void Awake()
         {
@@ -56,16 +56,16 @@ namespace Prototype.Application
 
             _nearby = FindNearestNpcInRange();
 
-            var dialogue = DialogueService?.Read();
+            var dialogue = ReadDialogue();
             if (dialogue != null && dialogue.IsOpen)
             {
                 Player.SetGameplayLocked(true);
                 UpdateDialogueView();
                 if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
-                    DialogueService.AdvanceOrClose();
+                    DialogueService.AdvanceOrClose().GetAwaiter().GetResult();
                 if (Input.GetKeyDown(KeyCode.Escape))
-                    DialogueService.Close();
-                if (!DialogueService.Read().IsOpen)
+                    DialogueService.Close().GetAwaiter().GetResult();
+                if (ReadDialogue()?.IsOpen != true)
                 {
                     SetDialogueVisible(false);
                     Player.SetGameplayLocked(false);
@@ -77,7 +77,8 @@ namespace Prototype.Application
             Player.SetGameplayLocked(false);
             if (_nearby != null && Input.GetKeyDown(KeyCode.E))
             {
-                DialogueService?.Open(_nearby);
+                if (DialogueService != null)
+                    DialogueService.Open(_nearby).GetAwaiter().GetResult();
                 Player.SetGameplayLocked(true);
                 UpdateDialogueView();
             }
@@ -128,7 +129,7 @@ namespace Prototype.Application
             var oldContentColor = GUI.contentColor;
             GUI.contentColor = new Color32(42, 30, 20, 255);
 
-            var dialogue = DialogueService?.Read();
+            var dialogue = ReadDialogue();
             if (dialogue != null && dialogue.IsOpen && _nearby != null)
             {
                 DrawDialogueBox(_nearby, dialogue.CurrentLine, dialogue.LineIndex + 1, dialogue.LineCount);
@@ -144,7 +145,7 @@ namespace Prototype.Application
 
         void UpdateDialogueView()
         {
-            var dialogue = DialogueService?.Read();
+            var dialogue = ReadDialogue();
             if (_dialoguePanel == null || dialogue == null || !dialogue.IsOpen || _nearby == null) return;
 
             var npc = _nearby;
@@ -173,6 +174,13 @@ namespace Prototype.Application
             if (_speakerText != null) _speakerText.color = color;
             if (_dialogueText != null) _dialogueText.color = color;
             if (_advanceText != null) _advanceText.color = color;
+        }
+
+        DialogueDto ReadDialogue()
+        {
+            if (DialogueService == null) return null;
+            var result = DialogueService.Read().GetAwaiter().GetResult();
+            return result.IsSuccess ? result.Value : null;
         }
 
         T FindChild<T>(string path) where T : Component

@@ -20,9 +20,10 @@ namespace Prototype.Application
         void Update()
         {
             if (_dateTimeText == null) return;
-            var snapshot = StateQuery?.Read();
-            if (snapshot != null)
-                _dateTimeText.text = FormatDateTime(snapshot.Clock);
+            if (StateQuery == null) return;
+            var result = StateQuery.Read().GetAwaiter().GetResult();
+            if (result.IsSuccess)
+                _dateTimeText.text = FormatDateTime(result.Value.Clock);
         }
 
         static string FormatDateTime(GameClockDto clock)

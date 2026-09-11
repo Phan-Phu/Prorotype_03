@@ -5,14 +5,12 @@ namespace Prototype.Application
 {
     public interface IGameWorldService
     {
-        GridCoord SeedShopCoord(GameState state);
-        bool IsSeedShopTile(GameState state, GridCoord coord);
-        void SetMoney(GameState state, int amount);
-        void RefillStamina(GameState state);
-        bool DebugSpawnTree(GameState state, GridCoord coord);
-        void ForceRespawnTrees(GameState state);
-        void ForceRipeAll(GameState state);
-        UniTask ForceRespawnTreesAsync(GameState state);
-        UniTask ForceRipeAllAsync(GameState state);
+        UniTask<Result<WorldFailure, GridCoord>> SeedShopCoord(GameState state);
+        UniTask<Result<WorldFailure, bool>> IsSeedShopTile(GameState state, GridCoord coord);
+        UniTask<Result<WorldFailure, Unit>> SetMoney(GameState state, int amount);
+        UniTask<Result<WorldFailure, Unit>> RefillStamina(GameState state);
+        UniTask<Result<WorldFailure, bool>> DebugSpawnTree(GameState state, GridCoord coord);
+        UniTask<Result<WorldFailure, Unit>> ForceRespawnTrees(GameState state);
+        UniTask<Result<WorldFailure, Unit>> ForceRipeAll(GameState state);
     }
 }

@@ -2,8 +2,9 @@ using System;
 using System.IO;
 using UnityEngine;
 using Prototype.Domain;
+using Prototype.Infrastructure;
 
-namespace Prototype.Application
+namespace Prototype.Infrastructure
 {
     /// <summary>
     /// Session action logger (S2-QA-06). Appends one CSV row (day,time,action,tile,result,money,stamina)

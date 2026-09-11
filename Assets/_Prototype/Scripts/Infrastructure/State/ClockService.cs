@@ -1,52 +1,72 @@
+using System;
 using Cysharp.Threading.Tasks;
+using Prototype.Application;
 using Prototype.Domain;
 
-namespace Prototype.Application
+namespace Prototype.Infrastructure
 {
-    /// <summary>Owns clock progression and day-rollover behavior outside the Domain raw model.</summary>
+    /// <summary>Infrastructure implementation of clock progression and day rollover.</summary>
     public sealed class ClockService : IClockService
     {
         public static int WrapHour(int hour) => ((hour % 24) + 24) % 24;
 
-        public GameClockDto Read(GameState state) => ToDto(state.Clock);
-
-        public GameClockDto Tick(GameState state, float deltaSeconds)
+        public UniTask<Result<ClockFailure, GameClockDto>> Read(GameState state)
         {
-            if (state == null || state.Clock == null) return default;
-            int hourMs = (int)(BalanceConfig.SecondsPerInGameHour * 1000f);
-            state.Clock.AccumulatedMilliseconds += (int)(deltaSeconds < 0f ? 0f : deltaSeconds * 1000f);
-            while (state.Clock.AccumulatedMilliseconds >= hourMs)
+            if (state?.Clock == null)
+                return ResultFactory.UniTaskFailure<ClockFailure, GameClockDto>(ClockFailure.NotInitialized());
+            return ResultFactory.UniTaskSuccess<ClockFailure, GameClockDto>(ToDto(state.Clock));
+        }
+
+        public UniTask<Result<ClockFailure, GameClockDto>> Tick(GameState state, float deltaSeconds)
+        {
+            if (state?.Clock == null)
+                return ResultFactory.UniTaskFailure<ClockFailure, GameClockDto>(ClockFailure.NotInitialized());
+            if (deltaSeconds < 0f)
+                return ResultFactory.UniTaskFailure<ClockFailure, GameClockDto>(ClockFailure.InvalidDelta(deltaSeconds));
+            return Safe("clock.tick", () =>
             {
-                state.Clock.AccumulatedMilliseconds -= hourMs;
-                AdvanceHour(state);
+                int hourMs = (int)(BalanceConfig.SecondsPerInGameHour * 1000f);
+                state.Clock.AccumulatedMilliseconds += (int)(deltaSeconds * 1000f);
+                while (state.Clock.AccumulatedMilliseconds >= hourMs)
+                {
+                    state.Clock.AccumulatedMilliseconds -= hourMs;
+                    AdvanceHour(state);
+                }
+                return ToDto(state.Clock);
+            });
+        }
+
+        public UniTask<Result<ClockFailure, GameClockDto>> SkipHour(GameState state)
+        {
+            if (state?.Clock == null)
+                return ResultFactory.UniTaskFailure<ClockFailure, GameClockDto>(ClockFailure.NotInitialized());
+            return Safe("clock.skip_hour", () => { AdvanceHour(state); return ToDto(state.Clock); });
+        }
+
+        public UniTask<Result<ClockFailure, GameClockDto>> ForceEndDay(GameState state)
+        {
+            if (state?.Clock == null)
+                return ResultFactory.UniTaskFailure<ClockFailure, GameClockDto>(ClockFailure.NotInitialized());
+            return Safe("clock.end_day", () => { EndDay(state); return ToDto(state.Clock); });
+        }
+
+        static UniTask<Result<ClockFailure, GameClockDto>> Safe(string context, Func<GameClockDto> operation)
+        {
+            try
+            {
+                return ResultFactory.UniTaskSuccess<ClockFailure, GameClockDto>(operation());
             }
-            return ToDto(state.Clock);
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogException(exception);
+                return ResultFactory.UniTaskFailure<ClockFailure, GameClockDto>(ClockFailure.System(context));
+            }
         }
-
-        public UniTask<GameClockDto> TickAsync(GameState state, float deltaSeconds)
-            => UniTask.FromResult(Tick(state, deltaSeconds));
-
-        public GameClockDto SkipHour(GameState state)
-        {
-            if (state != null && state.Clock != null) AdvanceHour(state);
-            return Read(state);
-        }
-
-        public GameClockDto ForceEndDay(GameState state)
-        {
-            if (state == null || state.Clock == null) return default;
-            EndDay(state);
-            return Read(state);
-        }
-
-        public UniTask<GameClockDto> ForceEndDayAsync(GameState state)
-            => UniTask.FromResult(ForceEndDay(state));
 
         static void AdvanceHour(GameState state)
         {
             state.Clock.Hour++;
-            if (state.Clock.Hour >= BalanceConfig.DayEndHour)
-                EndDay(state);
+            if (state.Clock.Hour >= BalanceConfig.DayEndHour) EndDay(state);
         }
 
         static void EndDay(GameState state)

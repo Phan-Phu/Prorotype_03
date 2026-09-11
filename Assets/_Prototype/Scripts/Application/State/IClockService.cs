@@ -5,11 +5,9 @@ namespace Prototype.Application
 {
     public interface IClockService
     {
-        GameClockDto Read(GameState state);
-        GameClockDto Tick(GameState state, float deltaSeconds);
-        UniTask<GameClockDto> TickAsync(GameState state, float deltaSeconds);
-        GameClockDto ForceEndDay(GameState state);
-        UniTask<GameClockDto> ForceEndDayAsync(GameState state);
-        GameClockDto SkipHour(GameState state);
+        UniTask<Result<ClockFailure, GameClockDto>> Read(GameState state);
+        UniTask<Result<ClockFailure, GameClockDto>> Tick(GameState state, float deltaSeconds);
+        UniTask<Result<ClockFailure, GameClockDto>> ForceEndDay(GameState state);
+        UniTask<Result<ClockFailure, GameClockDto>> SkipHour(GameState state);
     }
 }

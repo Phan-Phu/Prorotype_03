@@ -48,6 +48,70 @@ MonoBehaviour:
   - tool_wateringcan
   - tool_harvest
   - tool_axe
+  Items:
+  - ItemId: tool_hoe
+    DisplayName: Hoe
+    Description: Tills grass into prepared soil.
+    IconPath: Assets/Sprite Textures/Tools/tools.png
+    IconSpriteName: tools_21
+    Icon: {fileID: 21300042, guid: 853ac38383c680342ac7e688bf29b197, type: 3}
+    Stackable: 0
+  - ItemId: tool_wateringcan
+    DisplayName: Watering Can
+    Description: Waters prepared soil and growing crops.
+    IconPath: Assets/Sprite Textures/Tools/tools.png
+    IconSpriteName: tools_63
+    Icon: {fileID: 21300126, guid: 853ac38383c680342ac7e688bf29b197, type: 3}
+    Stackable: 0
+  - ItemId: tool_harvest
+    DisplayName: Harvest Basket
+    Description: Harvests ripe crops.
+    IconPath: Assets/Sprite Textures/Tools/tools.png
+    IconSpriteName: tools_252
+    Icon: {fileID: 21300504, guid: 853ac38383c680342ac7e688bf29b197, type: 3}
+    Stackable: 0
+  - ItemId: tool_axe
+    DisplayName: Axe
+    Description: Chops trees into wood.
+    IconPath: Assets/Sprite Textures/Tools/tools.png
+    IconSpriteName: tools_0
+    Icon: {fileID: 21300000, guid: 853ac38383c680342ac7e688bf29b197, type: 3}
+    Stackable: 0
+  - ItemId: turnip_seed
+    DisplayName: Turnip Seed
+    Description: Plant this seed on prepared soil.
+    IconPath: Assets/Sprite Textures/Objects/ParsnipSeeds.png
+    IconSpriteName:
+    Icon: {fileID: 21300000, guid: 7da78110e28e0f74aaa3ef4a41f4c0ed, type: 3}
+    Stackable: 1
+  - ItemId: potato_seed
+    DisplayName: Potato Seed
+    Description: Plant this seed on prepared soil.
+    IconPath: Assets/Sprite Textures/Objects/ParsnipSeeds.png
+    IconSpriteName:
+    Icon: {fileID: 21300000, guid: 7da78110e28e0f74aaa3ef4a41f4c0ed, type: 3}
+    Stackable: 1
+  - ItemId: turnip
+    DisplayName: Turnip
+    Description: A turnip harvested from a mature crop.
+    IconPath: Assets/Sprite Textures/Objects/ParsnipSeeds.png
+    IconSpriteName:
+    Icon: {fileID: 21300000, guid: 7da78110e28e0f74aaa3ef4a41f4c0ed, type: 3}
+    Stackable: 1
+  - ItemId: potato
+    DisplayName: Potato
+    Description: A potato harvested from a mature crop.
+    IconPath: Assets/Sprite Textures/Objects/ParsnipSeeds.png
+    IconSpriteName:
+    Icon: {fileID: 21300000, guid: 7da78110e28e0f74aaa3ef4a41f4c0ed, type: 3}
+    Stackable: 1
+  - ItemId: wood
+    DisplayName: Wood
+    Description: Useful wood collected from chopped trees.
+    IconPath: Assets/Sprite Textures/Objects/Wood.png
+    IconSpriteName:
+    Icon: {fileID: 21300000, guid: e26dc0d638731ec47abe9c4b3cae62ac, type: 3}
+    Stackable: 1
   NpcInteractionRadiusTiles: 1.25
   Npcs:
   - Id: cora

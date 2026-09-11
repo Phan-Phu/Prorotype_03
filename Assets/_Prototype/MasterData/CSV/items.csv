@@ -1,0 +1,10 @@
+ItemId,DisplayName,Description,IconPath,IconSpriteName,Stackable
+tool_hoe,Hoe,"Tills grass into prepared soil.",Assets/Sprite Textures/Tools/tools.png,tools_21,false
+tool_wateringcan,Watering Can,"Waters prepared soil and growing crops.",Assets/Sprite Textures/Tools/tools.png,tools_63,false
+tool_harvest,Harvest Basket,"Harvests ripe crops.",Assets/Sprite Textures/Tools/tools.png,tools_252,false
+tool_axe,Axe,"Chops trees into wood.",Assets/Sprite Textures/Tools/tools.png,tools_0,false
+turnip_seed,Turnip Seed,"Plant this seed on prepared soil.",Assets/Sprite Textures/Objects/ParsnipSeeds.png,,true
+potato_seed,Potato Seed,"Plant this seed on prepared soil.",Assets/Sprite Textures/Objects/ParsnipSeeds.png,,true
+turnip,Turnip,"A turnip harvested from a mature crop.",Assets/Sprite Textures/Objects/ParsnipSeeds.png,,true
+potato,Potato,"A potato harvested from a mature crop.",Assets/Sprite Textures/Objects/ParsnipSeeds.png,,true
+wood,Wood,"Useful wood collected from chopped trees.",Assets/Sprite Textures/Objects/Wood.png,,true

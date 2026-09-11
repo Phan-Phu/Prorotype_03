@@ -38,9 +38,21 @@ namespace Prototype.Infrastructure
         [Header("Starting inventory")]
         public string[] StartingItems = new string[0];
 
+        [Header("Items / UI content")]
+        public ItemEntry[] Items = new ItemEntry[0];
+
         [Header("NPCs")]
         public float NpcInteractionRadiusTiles = 1.25f;
         public NpcEntry[] Npcs = new NpcEntry[0];
+
+        public ItemEntry GetItem(string itemId)
+        {
+            if (Items == null || string.IsNullOrWhiteSpace(itemId)) return null;
+            for (int i = 0; i < Items.Length; i++)
+                if (Items[i] != null && string.Equals(Items[i].ItemId, itemId, StringComparison.OrdinalIgnoreCase))
+                    return Items[i];
+            return null;
+        }
 
         public Result<MasterDataFailure, MasterDataSnapshot> Import()
         {
@@ -68,6 +80,14 @@ namespace Prototype.Infrastructure
                         new GridCoord(entry.X, entry.Y), entry.Lines ?? new string[0], entry.FallbackColor);
                 }
 
+                var items = new ItemMasterData[Items.Length];
+                for (int i = 0; i < Items.Length; i++)
+                {
+                    var entry = Items[i];
+                    items[i] = new ItemMasterData(entry.ItemId, entry.DisplayName,
+                        entry.Description, entry.IconPath, entry.IconSpriteName, entry.Stackable);
+                }
+
                 var snapshot = new MasterDataSnapshot(
                     new PlayerMasterData(MoveSpeed, MaxStamina, StartMoney),
                     new TimeMasterData(SecondsPerInGameHour, DayStartHour, DayEndHour),
@@ -78,7 +98,8 @@ namespace Prototype.Infrastructure
                         Tree.WoodSellPrice, Tree.RespawnDays, Tree.InitialCount, Tree.WoodItemId),
                     npcs,
                     NpcInteractionRadiusTiles,
-                    StartingItems);
+                    StartingItems,
+                    items);
                 return ResultFactory.Success<MasterDataFailure, MasterDataSnapshot>(snapshot);
             }
             catch (Exception exception)
@@ -118,6 +139,18 @@ namespace Prototype.Infrastructure
                 WoodItemId = "wood"
             };
             StartingItems = new[] { ToolItemIds.Hoe, ToolItemIds.WateringCan, ToolItemIds.Harvest, ToolItemIds.Axe };
+            Items = new[]
+            {
+                new ItemEntry(ToolItemIds.Hoe, "Hoe", "Tills grass into prepared soil.", "Assets/Sprite Textures/Tools/tools.png", "tools_21", false),
+                new ItemEntry(ToolItemIds.WateringCan, "Watering Can", "Waters prepared soil and growing crops.", "Assets/Sprite Textures/Tools/tools.png", "tools_63", false),
+                new ItemEntry(ToolItemIds.Harvest, "Harvest Basket", "Harvests ripe crops.", "Assets/Sprite Textures/Tools/tools.png", "tools_252", false),
+                new ItemEntry(ToolItemIds.Axe, "Axe", "Chops trees into wood.", "Assets/Sprite Textures/Tools/tools.png", "tools_0", false),
+                new ItemEntry("turnip_seed", "Turnip Seed", "Plant this seed on prepared soil.", "Assets/Sprite Textures/Objects/ParsnipSeeds.png", "", true),
+                new ItemEntry("potato_seed", "Potato Seed", "Plant this seed on prepared soil.", "Assets/Sprite Textures/Objects/ParsnipSeeds.png", "", true),
+                new ItemEntry("turnip", "Turnip", "A turnip harvested from a mature crop.", "Assets/Sprite Textures/Objects/ParsnipSeeds.png", "", true),
+                new ItemEntry("potato", "Potato", "A potato harvested from a mature crop.", "Assets/Sprite Textures/Objects/ParsnipSeeds.png", "", true),
+                new ItemEntry("wood", "Wood", "Useful wood collected from chopped trees.", "Assets/Sprite Textures/Objects/Wood.png", "", true)
+            };
             NpcInteractionRadiusTiles = NpcDefinitions.InteractionRadiusTiles;
             Npcs = new[]
             {
@@ -160,6 +193,29 @@ namespace Prototype.Infrastructure
                 || Tree.WoodSellPrice < 0 || Tree.RespawnDays <= 0 || Tree.InitialCount < 0
                 || string.IsNullOrWhiteSpace(Tree.WoodItemId))
                 return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("tree"));
+            if (Items == null || Items.Length == 0)
+                return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("items"));
+            var itemIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in Items)
+            {
+                if (item == null || string.IsNullOrWhiteSpace(item.ItemId)
+                    || string.IsNullOrWhiteSpace(item.DisplayName)
+                    || string.IsNullOrWhiteSpace(item.Description)
+                    || string.IsNullOrWhiteSpace(item.IconPath))
+                    return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("item"));
+                if (!itemIds.Add(item.ItemId))
+                    return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("duplicate_item"));
+            }
+            foreach (var crop in Crops)
+                if (!itemIds.Contains(crop.SeedItemId) || !itemIds.Contains(crop.ProduceItemId))
+                    return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("crop_item_reference"));
+            if (!itemIds.Contains(Tree.WoodItemId))
+                return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("tree_item_reference"));
+            if (StartingItems == null)
+                return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("starting_items"));
+            foreach (var itemId in StartingItems)
+                if (string.IsNullOrWhiteSpace(itemId) || !itemIds.Contains(itemId))
+                    return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("starting_item_reference"));
             if (Npcs == null) return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("npcs"));
             if (NpcInteractionRadiusTiles <= 0f)
                 return ResultFactory.Failure<MasterDataFailure>(MasterDataFailure.Invalid("npc_interaction_radius"));
@@ -202,6 +258,30 @@ namespace Prototype.Infrastructure
         }
 
         [Serializable]
+        public sealed class ItemEntry
+        {
+            public string ItemId;
+            public string DisplayName;
+            [TextArea(2, 5)] public string Description;
+            public string IconPath;
+            public string IconSpriteName;
+            public Sprite Icon;
+            public bool Stackable = true;
+
+            public ItemEntry() { }
+            public ItemEntry(string itemId, string displayName, string description,
+                string iconPath, string iconSpriteName, bool stackable)
+            {
+                ItemId = itemId;
+                DisplayName = displayName;
+                Description = description;
+                IconPath = iconPath;
+                IconSpriteName = iconSpriteName;
+                Stackable = stackable;
+            }
+        }
+
+        [Serializable]
         public sealed class NpcEntry
         {
             public string Id;
@@ -223,9 +303,12 @@ namespace Prototype.Infrastructure
 
     public static class MasterDataImporter
     {
+        public static MasterDataAsset LoadAsset()
+            => Resources.Load<MasterDataAsset>("MasterData");
+
         public static UniTask<Result<MasterDataFailure, MasterDataSnapshot>> Load()
         {
-            var asset = Resources.Load<MasterDataAsset>("MasterData");
+            var asset = LoadAsset();
             if (asset == null)
                 return ResultFactory.UniTaskFailure<MasterDataFailure, MasterDataSnapshot>(MasterDataFailure.MissingAsset());
             return UniTask.FromResult(asset.Import());

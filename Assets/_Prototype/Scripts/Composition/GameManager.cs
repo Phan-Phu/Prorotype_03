@@ -17,6 +17,7 @@ namespace Prototype.Application
         public static GameManager Instance { get; private set; }
         public GameState State { get; private set; }
         public MasterDataSnapshot MasterData { get; private set; }
+        public MasterDataAsset MasterDataAsset { get; private set; }
 
         private PlayerController _player;
         private DebugPanel _debug;
@@ -46,6 +47,7 @@ namespace Prototype.Application
 
             // Load the aggregate through the Domain repository port. Infrastructure owns the
             // storage adapter; GameState itself remains a Domain entity.
+            MasterDataAsset = MasterDataImporter.LoadAsset();
             var masterDataResult = MasterDataImporter.Load().GetAwaiter().GetResult();
             if (!masterDataResult.IsSuccess)
             {
@@ -289,6 +291,7 @@ namespace Prototype.Application
                 shop = label.AddComponent<SeedShopUI>();
             }
             shop.State = State;
+            shop.MasterDataAsset = MasterDataAsset;
             shop.GameplayService = _services.GetRequiredService<IGameplayService>();
             shop.InventoryService = _services.GetRequiredService<Prototype.Domain.IInventoryService>();
             shop.Player = _player;

@@ -14,6 +14,7 @@ namespace Prototype.Application
         public static bool IsOpen => Instance != null && Instance._open;
 
         public GameState State;
+        public MasterDataAsset MasterDataAsset;
         public IGameplayService GameplayService;
         public IInventoryService InventoryService;
         public PlayerController Player;
@@ -23,6 +24,8 @@ namespace Prototype.Application
         CropId? _selectedCrop;
         GameObject _panel;
         Text _detailTitle, _detailText, _priceText, _feedbackText;
+        Image _detailIcon;
+        Button _turnipButton, _potatoButton;
         Button _buyButton;
 
         CropMasterData CropData(CropId crop) => State?.MasterData?.GetCrop(crop);
@@ -32,6 +35,7 @@ namespace Prototype.Application
         int SellPrice(CropId crop) => CropData(crop)?.SellPrice ?? CropDefinition.SellPrice(crop);
         string WoodItemId => State?.MasterData?.Tree?.WoodItemId ?? TreeDefinition.WoodItemId;
         int WoodSellPrice => State?.MasterData?.Tree?.WoodSellPrice ?? TreeDefinition.WoodSellPrice;
+        MasterDataAsset.ItemEntry ItemData(string itemId) => MasterDataAsset?.GetItem(itemId);
 
         void Awake()
         {
@@ -102,14 +106,16 @@ namespace Prototype.Application
             var list = EnsurePanel(panel, "ItemListPanel", new Vector2(300, 350), new Vector2(-210, -10));
             var listTitle = EnsureText(list.transform, "ListTitle", "Seeds", 18, TextAnchor.MiddleLeft);
             SetRect(listTitle.rectTransform, new Vector2(270, 32), new Vector2(0, 1), new Vector2(0, 1), new Vector2(15, -20));
-            EnsureButton(list.transform, "TurnipSeedButton", "Turnip Seed   -   20g", new Vector2(15, -70), ListTurnipSeed);
-            EnsureButton(list.transform, "PotatoSeedButton", "Potato Seed   -   50g", new Vector2(15, -135), ListPotatoSeed);
+            _turnipButton = EnsureButton(list.transform, "TurnipSeedButton", "Turnip Seed", new Vector2(15, -70), ListTurnipSeed);
+            _potatoButton = EnsureButton(list.transform, "PotatoSeedButton", "Potato Seed", new Vector2(15, -135), ListPotatoSeed);
 
             var detail = EnsurePanel(panel, "DetailPanel", new Vector2(350, 270), new Vector2(185, 45));
+            _detailIcon = EnsureImage(detail.transform, "DetailIcon");
+            SetRect(_detailIcon.rectTransform, new Vector2(76, 76), new Vector2(0, 1), new Vector2(0, 1), new Vector2(58, -55));
             _detailTitle = EnsureText(detail.transform, "DetailTitle", string.Empty, 20, TextAnchor.MiddleCenter);
-            SetRect(_detailTitle.rectTransform, new Vector2(320, 40), new Vector2(.5f, 1), new Vector2(.5f, 1), new Vector2(0, -25));
+            SetRect(_detailTitle.rectTransform, new Vector2(220, 40), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-120, -25));
             _detailText = EnsureText(detail.transform, "DetailText", string.Empty, 16, TextAnchor.UpperLeft);
-            SetRect(_detailText.rectTransform, new Vector2(300, 150), new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(0, -10));
+            SetRect(_detailText.rectTransform, new Vector2(300, 150), new Vector2(.5f, .5f), new Vector2(.5f, .5f), new Vector2(0, -25));
 
             var purchase = EnsurePanel(panel, "PurchasePanel", new Vector2(350, 70), new Vector2(185, -145));
             _priceText = EnsureText(purchase.transform, "PriceText", string.Empty, 18, TextAnchor.MiddleLeft);
@@ -180,25 +186,36 @@ namespace Prototype.Application
         void RefreshUi()
         {
             if (State == null || State.InventorySystem == null || _detailTitle == null) return;
+            SetButtonLabel(_turnipButton, $"{ItemName(SeedItemId(CropId.Turnip))}   -   {SeedPrice(CropId.Turnip)}g");
+            SetButtonLabel(_potatoButton, $"{ItemName(SeedItemId(CropId.Potato))}   -   {SeedPrice(CropId.Potato)}g");
             if (!_selectedCrop.HasValue)
             {
                 _detailTitle.text = string.Empty;
                 _detailText.text = string.Empty;
                 _priceText.text = string.Empty;
                 _buyButton.interactable = false;
+                if (_detailIcon != null) { _detailIcon.sprite = null; _detailIcon.enabled = false; }
             }
             else
             {
                 var crop = _selectedCrop.Value;
                 var seedId = SeedItemId(crop);
                 var price = SeedPrice(crop);
-                _detailTitle.text = $"{Label(crop)} Seed";
+                var item = ItemData(seedId);
+                _detailTitle.text = item?.DisplayName ?? $"{Label(crop)} Seed";
                 int owned = InventoryService != null
                     ? InventoryService.Count(State.InventorySystem, seedId).GetAwaiter().GetResult().Value
                     : 0;
-                _detailText.text = $"Plant this seed on prepared soil.\n\nPrice: {price}g\nOwned: {owned}";
+                string description = item != null ? item.Description : "Plant this seed on prepared soil.";
+                _detailText.text = $"{description}\n\nPrice: {price}g\nOwned: {owned}";
                 _priceText.text = $"{price}g   Money: {State.Wallet.Money}";
                 _buyButton.interactable = true;
+                if (_detailIcon != null)
+                {
+                    _detailIcon.sprite = item?.Icon;
+                    _detailIcon.color = PlaceholderArt.ItemTint(seedId);
+                    _detailIcon.enabled = _detailIcon.sprite != null;
+                }
             }
             if (_feedbackText != null && !_open) _feedbackText.text = string.Empty;
             PointerOverUI = _open;
@@ -349,6 +366,13 @@ namespace Prototype.Application
             return image;
         }
 
+        Image EnsureImage(Transform parent, string name)
+        {
+            var go = parent.Find(name)?.gameObject ?? new GameObject(name);
+            go.transform.SetParent(parent, false);
+            return go.GetComponent<Image>() ?? go.AddComponent<Image>();
+        }
+
         Text EnsureText(Transform parent, string name, string value, int fontSize, TextAnchor alignment)
         {
             var go = parent.Find(name)?.gameObject ?? new GameObject(name);
@@ -362,6 +386,14 @@ namespace Prototype.Application
         {
             rect.anchorMin = min; rect.anchorMax = max; rect.anchoredPosition = position; rect.sizeDelta = size;
         }
+
+        static void SetButtonLabel(Button button, string value)
+        {
+            var label = button != null ? button.transform.Find("Label")?.GetComponent<Text>() : null;
+            if (label != null) label.text = value;
+        }
+
+        string ItemName(string itemId) => ItemData(itemId)?.DisplayName ?? itemId;
 
         static string Label(CropId crop) => crop == CropId.Turnip ? "Turnip" : "Potato";
     }

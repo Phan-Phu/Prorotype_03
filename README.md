@@ -30,11 +30,12 @@ outside this repository.
   Their namespace is `Prototype.Infrastructure`; Application only consumes
   their contracts and typed results.
 - Runtime balance and content are authored in
+  `Assets/_Prototype/MasterData/CSV/` and imported into
   `Assets/_Prototype/Resources/MasterData.asset`. `MasterDataImporter` validates
   that asset and converts it to the immutable Domain `MasterDataSnapshot` before
-  `GameState` is created. Player/time/tool costs, crops, trees, starting items
-  and NPC dialogue therefore have one editable source instead of parallel
-  hard-coded values.
+  `GameState` is created. Player/time/tool costs, crops, trees, starting items,
+  NPC dialogue, item descriptions and item art references therefore have one
+  reviewable source instead of parallel hard-coded values.
 - Inventory is grouped under `Domain/Inventory/`: raw entity, Domain service
   ports and inventory value objects. Its behavior implementation is under
   `Infrastructure/Inventory/`; the UI query interface and slot read data are
@@ -104,12 +105,16 @@ For a headless compile check:
 
 ## Master Data workflow
 
-1. Select `Prototype/Master Data/Create or Reset Prototype Asset` in the Unity
-   editor when the prototype defaults need to be restored.
-2. Edit `Assets/_Prototype/Resources/MasterData.asset` in the Inspector.
-3. On startup, `GameManager` calls `MasterDataImporter.Load()` and stops with a
+1. Edit the CSV files under `Assets/_Prototype/MasterData/CSV/`.
+2. Select `Prototype/Master Data/Import CSV to Scriptable Asset` in the Unity
+   editor. The Infrastructure converter parses the CSV, validates it, resolves
+   `IconPath` + `IconSpriteName` through the editor asset database, and writes
+   the result to the ScriptableObject.
+3. Use `Assets/_Prototype/Resources/MasterData.asset` to review or fine-tune
+   the generated Sprite and UI content references.
+4. On startup, `GameManager` calls `MasterDataImporter.Load()` and stops with a
    typed failure if the asset is missing or invalid.
-4. Infrastructure passes the imported snapshot into `GameState`; gameplay and
+5. Infrastructure passes the imported snapshot into `GameState`; gameplay and
    UI services read prices, growth days, stamina costs, NPC data and clock rules
    from that snapshot.
 

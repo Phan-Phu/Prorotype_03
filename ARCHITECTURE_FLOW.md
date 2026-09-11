@@ -18,7 +18,7 @@ flowchart LR
     end
 
     Bootstrap[GameManager\ncomposition root] --> DI[Microsoft DI]
-    Bootstrap --> MD[MasterDataImporter\nResources/MasterData.asset]
+    Bootstrap --> MD[MasterDataImporter\nCSV → MasterData.asset]
     MD --> Snapshot[Domain MasterDataSnapshot]
     DI --> Infra[Infrastructure services\nUniTask + typed Result + mapping]
     Snapshot --> Infra
@@ -80,7 +80,7 @@ Prototype.Application
 Prototype.Infrastructure
   InventoryService / UniTask + typed Result implementations
   ClockService / GameplayService / DialogueService
-  MasterDataAsset / MasterDataImporter / validation + mapping
+  MasterDataCsvImporter / MasterDataAsset / validation + mapping
   GameStateApplicationService / repository adapters
   ArtCatalog / PlaceholderArt / SessionLogger
         │
@@ -114,13 +114,17 @@ world renderer still receives the raw runtime aggregate through the composition
 root for map/collision/sprite queries; new state mutation must go through
 Infrastructure. There is no `Farm.Prototype.*` namespace in the current source.
 
-Master Data is the content boundary. `MasterDataAsset` is the Unity-authored
-source in Infrastructure; `MasterDataImporter` validates it and maps it to the
+Master Data is the content boundary. CSV files under
+`Assets/_Prototype/MasterData/CSV/` are the reviewable source. The Infrastructure
+`MasterDataCsvImporter` parses and validates them, resolves item art through the
+Editor adapter, and writes `MasterDataAsset` in `Resources`. Runtime
+`MasterDataImporter` then validates that ScriptableObject and maps it to the
 immutable `Prototype.Domain.MasterDataSnapshot`. `GameManager` imports the
 snapshot before calling `IGameStateRepository.Load(...)`. The Domain aggregate
-receives only that snapshot and never reads `Resources`, `ScriptableObject` or
-`AssetDatabase`. Infrastructure services then use the snapshot for gameplay
-rules, while Application uses the resulting state/DTOs for UI.
+receives only that snapshot and never reads CSV, `Resources`, `ScriptableObject`
+or `AssetDatabase`. Infrastructure services then use the snapshot for gameplay
+rules, while Application uses the resulting state/DTOs and ScriptableObject art
+references for UI.
 
 The physical folders under `Assets/_Prototype/Scripts/Application/` are only
 for navigation (`UI`, `Player`, `NPC`, `World`, `Debug`, etc.). They are not
@@ -165,7 +169,8 @@ created in Infrastructure, never in Domain.
 Important bootstrap behavior:
 
 - `Prototype_Main.unity` contains the main camera and authored UI canvas roots.
-- `MasterData.asset` is loaded and validated before `GameState` is constructed;
+- `MasterData.asset` (generated from CSV) is loaded and validated before
+  `GameState` is constructed;
   an invalid asset returns a typed `MasterDataFailure` and prevents a partially
   configured session from starting.
 - `ToolbarCanvasUI` is found in the scene and bound to `Player` and

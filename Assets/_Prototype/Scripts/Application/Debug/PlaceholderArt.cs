@@ -123,6 +123,9 @@ namespace Prototype.Application
         /// </summary>
         public static Sprite ItemIcon(string itemId)
         {
+            var masterItem = GameManager.Instance?.MasterDataAsset?.GetItem(itemId);
+            if (masterItem != null && masterItem.Icon != null) return masterItem.Icon;
+
             var icons = Art?.ToolIcons;
             if (icons == null || icons.Length < 4) return null;
             if (itemId == Prototype.Domain.ToolItemIds.Hoe)         return icons[0];

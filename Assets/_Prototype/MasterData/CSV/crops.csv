@@ -1,0 +1,3 @@
+CropId,SeedItemId,ProduceItemId,SeedPrice,SellPrice,GrowthDays
+Turnip,turnip_seed,turnip,20,60,4
+Potato,potato_seed,potato,50,160,6

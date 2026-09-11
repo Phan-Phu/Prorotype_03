@@ -1,0 +1,22 @@
+{
+  "name": "Farm.Prototype.Editor",
+  "rootNamespace": "Farm.Prototype.Editor",
+  "references": [
+    "Farm.Prototype",
+    "Unity.2D.Sprite",
+    "Unity.2D.Tilemap",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

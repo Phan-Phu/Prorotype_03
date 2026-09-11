@@ -4,6 +4,33 @@
 #
 # Recommended: add any editor/OS/tool-specific ignore rules from the Global/ templates as needed.
 # See: https://github.com/github/gitignore/tree/main/Global
+
+# ------------------------------------------------------------------------------
+# Dev-only repository policy
+# Keep Unity project assets and developer source only.  Hermes/Kanban, PM,
+# designer, QA, generated reports, templates and local automation stay local.
+# ------------------------------------------------------------------------------
+/.agents/
+/.claude/
+/.vscode/
+/Agent/
+/Artifacts/
+/Assets/Artifacts/
+/Assets/Artifacts.meta
+/tools/
+/tmp/
+/ProjectSetupTemplate/
+/ProjectSetupTemplate.zip
+/setup-hermes-kanban.ps1
+/KANBAN.md
+/DESIGN_BRIEFS.md
+/BUG_REPORTS.md
+/QA-*.md
+/DECISION_LOG.md
+/LATER.md
+/tools_zoom.png
+/Assets/Tests/
+/Assets/Tests.meta
 #
 .utmp/
 /[Ll]ibrary/

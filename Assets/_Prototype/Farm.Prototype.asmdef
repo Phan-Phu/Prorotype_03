@@ -1,0 +1,22 @@
+{
+  "name": "Farm.Prototype",
+  "rootNamespace": "Farm.Prototype",
+  "references": [
+    "Unity.InputSystem",
+    "Unity.Cinemachine",
+    "GUID:f51ebe6a0ceec4240a699833d6309b23"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [
+    "Microsoft.Extensions.DependencyInjection.dll",
+    "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+    "UniTask.dll"
+  ],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

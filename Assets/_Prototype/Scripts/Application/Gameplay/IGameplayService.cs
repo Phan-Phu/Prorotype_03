@@ -57,12 +57,9 @@ namespace Prototype.Application
 
     public interface IGameplayService
     {
-        ToolActionDto UseTool(GameState state, ToolType tool, GridCoord coord);
-        UniTask<ToolActionDto> UseToolAsync(GameState state, ToolType tool, GridCoord coord);
-        ToolActionDto PlantSpecific(GameState state, CropId crop, GridCoord coord);
-        ShopPurchaseDto BuySeed(GameState state, CropId crop);
-        UniTask<ShopPurchaseDto> BuySeedAsync(GameState state, CropId crop);
-        ShopSellDto SellItem(GameState state, string itemId, int pricePerUnit, int count);
-        UniTask<ShopSellDto> SellItemAsync(GameState state, string itemId, int pricePerUnit, int count);
+        UniTask<OperationResult<ToolActionDto>> UseTool(GameState state, ToolType tool, GridCoord coord);
+        UniTask<OperationResult<ToolActionDto>> PlantSpecific(GameState state, CropId crop, GridCoord coord);
+        UniTask<OperationResult<ShopPurchaseDto>> BuySeed(GameState state, CropId crop);
+        UniTask<OperationResult<ShopSellDto>> SellItem(GameState state, string itemId, int pricePerUnit, int count);
     }
 }

@@ -1,6 +1,6 @@
 namespace Prototype.Domain
 {
-    public enum ToolResultCode { Success, WrongTool, NoStamina, InvalidTile, NoSeed, NotChoppable, Blocked, InventoryFull }
+    public enum ToolResultCode { Success, WrongTool, NoStamina, InvalidTile, NoSeed, NotChoppable, Blocked, InventoryFull, SystemError }
 
     public enum FeedbackKind { Till, Plant, Water, Harvest, Chop, Miss }
 

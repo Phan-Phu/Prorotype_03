@@ -121,7 +121,7 @@ namespace Prototype.Application
             }
             by += 26;
             if (GUI.Button(new Rect(x + 8, by, w - 16, 22), "Sell all Wood") && GameplayService != null && InventoryService != null)
-                GameplayService.SellItem(State, TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, CountInventory(TreeDefinition.WoodItemId));
+                GameplayService.SellItem(State, TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, CountInventory(TreeDefinition.WoodItemId)).GetAwaiter().GetResult();
             by += 26;
             // S2-QA-05: bug-bash hooks for the wood feature — spawn a tree right next to the player
             // (instead of trekking to the corner GameState.SeedTrees seeds at start) and force every
@@ -176,7 +176,7 @@ namespace Prototype.Application
         {
             string itemId = CropDefinition.ProduceItemId(crop);
             GameplayService.SellItem(State, itemId, CropDefinition.SellPrice(crop),
-                CountInventory(itemId));
+                CountInventory(itemId)).GetAwaiter().GetResult();
         }
 
         void AddInventory(string itemId, int amount = 1)
@@ -190,6 +190,6 @@ namespace Prototype.Application
         }
 
         int CountInventory(string itemId)
-            => InventoryService == null ? 0 : InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult();
+            => InventoryService == null ? 0 : InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult().Data;
     }
 }

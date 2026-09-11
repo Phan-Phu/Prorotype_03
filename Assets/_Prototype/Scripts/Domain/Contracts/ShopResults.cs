@@ -1,7 +1,7 @@
 namespace Prototype.Domain
 {
-    public enum ShopPurchaseResultCode { Success, InsufficientFunds, InventoryFull }
-    public enum ShopSellResultCode { Success, EmptyInventory, InvalidCount }
+    public enum ShopPurchaseResultCode { Success, InsufficientFunds, InventoryFull, InvalidItem, SystemError }
+    public enum ShopSellResultCode { Success, EmptyInventory, InvalidCount, InvalidItem, SystemError }
 
     public readonly struct ShopPurchaseResult
     {

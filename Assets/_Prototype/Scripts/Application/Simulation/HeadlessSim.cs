@@ -64,7 +64,7 @@ namespace Prototype.Application
                 {
                     var tile = state.Grid.GetTile(c);
                     if (tile?.Crop != null && tile.Crop.IsRipe)
-                        if (gameplay.UseTool(state, ToolType.Harvest, c).IsSuccess) harvested++;
+                        if (gameplay.UseTool(state, ToolType.Harvest, c).GetAwaiter().GetResult().IsSuccess) harvested++;
                 }
 
                 // 2. Chop every standing tree the farmer can reach this day (S2-DEV-07,
@@ -79,7 +79,7 @@ namespace Prototype.Application
                 {
                     var found = FindFreeGrassTile(state, claimed);
                     if (found == null) break; // ran out of grass on this grid
-                    if (!gameplay.UseTool(state, ToolType.Hoe, found.Value).IsSuccess) break; // out of stamina
+                    if (!gameplay.UseTool(state, ToolType.Hoe, found.Value).GetAwaiter().GetResult().IsSuccess) break; // out of stamina
                     plots.Add(found.Value);
                     claimed.Add(found.Value);
                 }
@@ -91,8 +91,8 @@ namespace Prototype.Application
                     if (tile == null || tile.Crop != null) continue;
                     var crop = ChooseCrop(state, forceCrop);
                     if (crop == null) continue; // can't afford anything for this plot right now
-                    if (!gameplay.BuySeed(state, crop.Value).IsSuccess) continue;
-                    gameplay.PlantSpecific(state, crop.Value, c);
+                    if (!gameplay.BuySeed(state, crop.Value).GetAwaiter().GetResult().IsSuccess) continue;
+                    gameplay.PlantSpecific(state, crop.Value, c).GetAwaiter().GetResult();
                 }
 
                 // 5. Water everything planted (IsWatered resets every day rollover — CropInstance only
@@ -101,18 +101,18 @@ namespace Prototype.Application
                 {
                     var tile = state.Grid.GetTile(c);
                     if (tile?.Crop != null && !tile.IsWatered)
-                        gameplay.UseTool(state, ToolType.WateringCan, c);
+                        gameplay.UseTool(state, ToolType.WateringCan, c).GetAwaiter().GetResult();
                 }
 
                 // 6. Sell carried produce and wood through the same sell channel a real interaction
                 // uses; harvest itself only adds produce to inventory, it no longer credits Wallet.
                 gameplay.SellItem(state, CropDefinition.ProduceItemId(CropId.Turnip),
-                    CropDefinition.SellPrice(CropId.Turnip), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Turnip)).GetAwaiter().GetResult());
+                    CropDefinition.SellPrice(CropId.Turnip), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Turnip)).GetAwaiter().GetResult().Data);
                 gameplay.SellItem(state, CropDefinition.ProduceItemId(CropId.Potato),
-                    CropDefinition.SellPrice(CropId.Potato), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Potato)).GetAwaiter().GetResult());
+                    CropDefinition.SellPrice(CropId.Potato), inventory.Count(state.InventorySystem, CropDefinition.ProduceItemId(CropId.Potato)).GetAwaiter().GetResult().Data);
                 var woodResult = gameplay.SellItem(state, TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice,
-                    inventory.Count(state.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult());
-                int woodIncome = woodResult.Earned;
+                    inventory.Count(state.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult().Data).GetAwaiter().GetResult();
+                int woodIncome = woodResult.IsSuccess ? woodResult.Data.Earned : 0;
 
                 int staminaUsed = staminaStart - state.Stamina.Current;
                 sb.AppendLine($"{state.Clock.Day},{state.Wallet.Money},{plots.Count},{staminaUsed},{harvested},{woodHarvested},{woodIncome}");
@@ -150,9 +150,9 @@ namespace Prototype.Application
                     var tile = state.Grid.GetTile(c);
                     while (tile.Object != null && tile.Object.IsAlive)
                     {
-                        var r = gameplay.UseTool(state, ToolType.Chop, c);
+                        var r = gameplay.UseTool(state, ToolType.Chop, c).GetAwaiter().GetResult();
                         if (!r.IsSuccess) return wood; // out of stamina — stop for the day
-                        wood += r.Amount; // >0 only on the felling hit
+                        wood += r.Data.Amount; // >0 only on the felling hit
                     }
                 }
             return wood;

@@ -273,14 +273,14 @@ namespace Prototype.Application
         ToolActionDto ResolveAction(string itemId, GridCoord coord)
         {
             if (GameplayService == null) return new ToolActionDto(ToolResultCode.WrongTool, FeedbackKind.Miss);
-            if (itemId == ToolItemIds.Hoe)         return GameplayService.UseTool(State, ToolType.Hoe, coord);
-            if (itemId == ToolItemIds.WateringCan) return GameplayService.UseTool(State, ToolType.WateringCan, coord);
-            if (itemId == ToolItemIds.Harvest)     return GameplayService.UseTool(State, ToolType.Harvest, coord);
-            if (itemId == ToolItemIds.Axe)         return GameplayService.UseTool(State, ToolType.Chop, coord);
+            if (itemId == ToolItemIds.Hoe)         return GameplayService.UseTool(State, ToolType.Hoe, coord).GetAwaiter().GetResult().Data;
+            if (itemId == ToolItemIds.WateringCan) return GameplayService.UseTool(State, ToolType.WateringCan, coord).GetAwaiter().GetResult().Data;
+            if (itemId == ToolItemIds.Harvest)     return GameplayService.UseTool(State, ToolType.Harvest, coord).GetAwaiter().GetResult().Data;
+            if (itemId == ToolItemIds.Axe)         return GameplayService.UseTool(State, ToolType.Chop, coord).GetAwaiter().GetResult().Data;
             if (itemId == Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Turnip))
-                return GameplayService.PlantSpecific(State, Prototype.Domain.CropId.Turnip, coord);
+                return GameplayService.PlantSpecific(State, Prototype.Domain.CropId.Turnip, coord).GetAwaiter().GetResult().Data;
             if (itemId == Prototype.Domain.CropDefinition.SeedItemId(Prototype.Domain.CropId.Potato))
-                return GameplayService.PlantSpecific(State, Prototype.Domain.CropId.Potato, coord);
+                return GameplayService.PlantSpecific(State, Prototype.Domain.CropId.Potato, coord).GetAwaiter().GetResult().Data;
             return new ToolActionDto(ToolResultCode.WrongTool, FeedbackKind.Miss);
         }
 

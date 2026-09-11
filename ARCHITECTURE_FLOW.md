@@ -18,7 +18,7 @@ flowchart LR
     end
 
     Bootstrap[GameManager\ncomposition root] --> DI[Microsoft DI]
-    DI --> Infra[Infrastructure services\nUniTask + DTO mapping]
+    DI --> Infra[Infrastructure services\nUniTask + OperationResult + mapping]
     Infra --> State[Domain raw state]
 
     Input --> Player[PlayerController]
@@ -26,7 +26,7 @@ flowchart LR
     Player --> Actions[Application controllers]
     UIIntent --> Actions
     Actions --> Infra
-    Infra --> Query[DTO snapshots]
+    Infra --> Query[typed application read data]
     Infra --> World
     Infra --> HUD[HUD DTO / clock]
     Query --> Canvas
@@ -48,8 +48,9 @@ flowchart LR
 
 Runtime ownership is intentionally explicit: the scene owns layout and art
 references, Application owns input-to-view coordination, Infrastructure owns
-behavior and DTO conversion, and Domain owns raw state/data contracts. UI never
-becomes the source of truth for inventory, wallet, crops or time.
+behavior, results and data conversion, and Domain owns raw state/data
+contracts. UI never becomes the source of truth for inventory, wallet, crops
+or time.
 
 ## 1. Current layer map
 
@@ -74,7 +75,7 @@ Prototype.Application
         │ calls Infrastructure only
         ▼
 Prototype.Infrastructure
-  InventoryService / UniTask implementations
+  InventoryService / UniTask + OperationResult implementations
   ClockService / GameplayService / DialogueService
   GameStateApplicationService / repository adapters
   ArtCatalog / PlaceholderArt / SessionLogger
@@ -98,7 +99,10 @@ etc.); there are no duplicate `*Async` methods. The implementation is
 exposes destination-typed projections through its generic mapper usage and
 returns `InventorySlotData[]` directly to the inventory UI. There is no
 Application inventory-query interface: the composition root injects the
-concrete Infrastructure service where a projection is needed.
+concrete Infrastructure service where a projection is needed. Infrastructure
+uses the same result contract for gameplay and shop operations: expected
+failures return a `FailureCode`, while unexpected exceptions become
+`SystemError` after logging.
 
 `Presentation` has been merged into `Application`. Feature actions call
 Infrastructure services and consume their DTOs. Domain contains no DTOs. The
@@ -248,7 +252,7 @@ sequenceDiagram
     V->>D: BuySeed(crop)
     D->>W: validate and spend money
     D->>I: add seed when capacity allows
-    D-->>V: ShopPurchaseDto
+    D-->>V: UniTask<OperationResult<ShopPurchaseDto>>
     V->>V: show feedback and refresh price/owned count
 ```
 
@@ -285,7 +289,10 @@ scene-authored. Runtime code updates item images, counts and selection state.
 `InventoryService` implements the Domain `IInventoryService` port and exposes
 the concrete read projection used by the Application inventory UI. DI registers
 the same instance for both the concrete Infrastructure service and the Domain
-port; the Domain inventory remains the source of truth.
+port; the Domain inventory remains the source of truth. Inventory mutations
+return `OperationResult`, so callers can distinguish `InventoryFull`,
+`InsufficientInventory`, `LockedSlot`, `NotInitialized` and `SystemError`
+without parsing UI text.
 
 ## 7. NPC dialogue flow
 

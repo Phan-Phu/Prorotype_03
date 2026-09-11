@@ -39,9 +39,14 @@ outside this repository.
   feature-specific snapshot wrapper. The inventory UI consumes the concrete
   Infrastructure service directly; there is no redundant `IInventoryQuery`
   interface.
-- Infrastructure exposes UniTask async entry points (`ReadAsync`, `TickAsync`,
-  `UseToolAsync`, `BuySeedAsync`, `SellItemAsync`, dialogue and debug async
-  methods) so storage/MasterData can become asynchronous later.
+- Infrastructure operations return `UniTask<OperationResult>` or the generic
+  `OperationResult<T>`. Expected gameplay failures use `FailureCode` values
+  such as `NotEnoughMoney`, `InventoryFull`, `InsufficientInventory` and
+  `InvalidArgument`; unexpected exceptions are logged and returned as
+  `SystemError`.
+- Infrastructure exposes UniTask operations directly; success and failure are
+  returned through `OperationResult` instead of duplicate sync/`*Async`
+  methods for Inventory and Gameplay.
 - UI is UGUI-based. Scene-authored objects provide the layout; application
   components bind state and user intent at runtime.
 - The main scene owns the authored canvas and toolbar hierarchy.

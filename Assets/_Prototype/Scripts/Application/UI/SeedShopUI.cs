@@ -185,7 +185,7 @@ namespace Prototype.Application
                 var price = CropDefinition.SeedPrice(crop);
                 _detailTitle.text = $"{Label(crop)} Seed";
                 int owned = InventoryService != null
-                    ? InventoryService.Count(State.InventorySystem, seedId).GetAwaiter().GetResult()
+                    ? InventoryService.Count(State.InventorySystem, seedId).GetAwaiter().GetResult().Data
                     : 0;
                 _detailText.text = $"Plant this seed on prepared soil.\n\nPrice: {price}g\nOwned: {owned}";
                 _priceText.text = $"{price}g   Money: {State.Wallet.Money}";
@@ -197,15 +197,27 @@ namespace Prototype.Application
 
         public ShopPurchaseResult Buy(CropId crop)
         {
-            var dto = GameplayService != null
-                ? GameplayService.BuySeed(State, crop)
-                : new ShopPurchaseDto(new ShopPurchaseResult(ShopPurchaseResultCode.InsufficientFunds,
-                    crop, CropDefinition.SeedItemId(crop), CropDefinition.SeedPrice(crop),
-                    State.Wallet.Money, State.Wallet.Money, 0, 0));
-            var result = new ShopPurchaseResult(dto.Code, dto.Crop, dto.ItemId, dto.Price,
-                dto.MoneyBefore, dto.MoneyAfter, dto.CountBefore, dto.CountAfter);
+            var operation = GameplayService != null
+                ? GameplayService.BuySeed(State, crop).GetAwaiter().GetResult()
+                : OperationResult<ShopPurchaseDto>.Failed(FailureCode.NotInitialized, "gameplay");
+            ShopPurchaseResult result;
+            if (operation.IsSuccess)
+            {
+                var dto = operation.Data;
+                result = new ShopPurchaseResult(dto.Code, dto.Crop, dto.ItemId, dto.Price,
+                    dto.MoneyBefore, dto.MoneyAfter, dto.CountBefore, dto.CountAfter);
+            }
+            else
+            {
+                string itemId = CropDefinition.SeedItemId(crop);
+                int price = CropDefinition.SeedPrice(crop);
+                result = new ShopPurchaseResult(MapPurchaseCode(operation.FailureCode), crop, itemId,
+                    price, State.Wallet.Money, State.Wallet.Money, 0, 0);
+            }
             SessionLogger.LogShopPurchase(State, result);
-            _feedbackText.text = result.IsSuccess ? $"Bought {Label(crop)} seed" : result.Code == ShopPurchaseResultCode.InsufficientFunds ? "Not enough money" : "Inventory full";
+            _feedbackText.text = result.IsSuccess
+                ? $"Bought {Label(crop)} seed"
+                : PurchaseFailureMessage(operation.FailureCode);
             RefreshUi();
             return result;
         }
@@ -218,7 +230,7 @@ namespace Prototype.Application
         public ShopSellResult SellWood()
         {
             int count = InventoryService != null
-                ? InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult()
+                ? InventoryService.Count(State.InventorySystem, TreeDefinition.WoodItemId).GetAwaiter().GetResult().Data
                 : 0;
             return SellItem(TreeDefinition.WoodItemId, TreeDefinition.WoodSellPrice, count, "Wood");
         }
@@ -230,7 +242,7 @@ namespace Prototype.Application
         {
             string itemId = CropDefinition.ProduceItemId(crop);
             int count = InventoryService != null
-                ? InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult()
+                ? InventoryService.Count(State.InventorySystem, itemId).GetAwaiter().GetResult().Data
                 : 0;
             return SellItem(itemId, CropDefinition.SellPrice(crop), count, Label(crop));
         }
@@ -240,16 +252,66 @@ namespace Prototype.Application
 
         ShopSellResult SellItem(string itemId, int pricePerUnit, int count, string displayName)
         {
-            var dto = GameplayService != null
-                ? GameplayService.SellItem(State, itemId, pricePerUnit, count)
-                : new ShopSellDto(new ShopSellResult(ShopSellResultCode.EmptyInventory, itemId,
-                    pricePerUnit, count, 0, State.Wallet.Money, State.Wallet.Money, 0, 0));
-            var result = new ShopSellResult(dto.Code, dto.ItemId, pricePerUnit, count, dto.Earned,
-                dto.MoneyBefore, dto.MoneyAfter, dto.CountBefore, dto.CountAfter);
+            var operation = GameplayService != null
+                ? GameplayService.SellItem(State, itemId, pricePerUnit, count).GetAwaiter().GetResult()
+                : OperationResult<ShopSellDto>.Failed(FailureCode.NotInitialized, "gameplay");
+            ShopSellResult result;
+            if (operation.IsSuccess)
+            {
+                var dto = operation.Data;
+                result = new ShopSellResult(dto.Code, dto.ItemId, pricePerUnit, count, dto.Earned,
+                    dto.MoneyBefore, dto.MoneyAfter, dto.CountBefore, dto.CountAfter);
+            }
+            else
+            {
+                result = new ShopSellResult(MapSellCode(operation.FailureCode), itemId, pricePerUnit,
+                    count, 0, State.Wallet.Money, State.Wallet.Money, 0, 0);
+            }
             _feedbackText.text = result.IsSuccess
                 ? $"Sold {displayName} for {result.Earned}g"
-                : $"No {displayName} to sell";
+                : SellFailureMessage(operation.FailureCode, displayName);
             return result;
+        }
+
+        static ShopPurchaseResultCode MapPurchaseCode(FailureCode code)
+            => code == FailureCode.NotEnoughMoney
+                ? ShopPurchaseResultCode.InsufficientFunds
+                : code == FailureCode.InventoryFull || code == FailureCode.LockedSlot
+                    ? ShopPurchaseResultCode.InventoryFull
+                    : code == FailureCode.SystemError
+                        ? ShopPurchaseResultCode.SystemError
+                        : ShopPurchaseResultCode.InvalidItem;
+
+        static ShopSellResultCode MapSellCode(FailureCode code)
+            => code == FailureCode.InsufficientInventory || code == FailureCode.ItemNotFound
+                ? ShopSellResultCode.EmptyInventory
+                : code == FailureCode.SystemError
+                    ? ShopSellResultCode.SystemError
+                    : code == FailureCode.InvalidArgument
+                        ? ShopSellResultCode.InvalidCount
+                        : ShopSellResultCode.InvalidItem;
+
+        static string PurchaseFailureMessage(FailureCode code)
+        {
+            switch (code)
+            {
+                case FailureCode.NotEnoughMoney: return "Not enough money";
+                case FailureCode.InventoryFull:
+                case FailureCode.LockedSlot: return "Inventory full";
+                case FailureCode.SystemError: return "Shop system error";
+                default: return "Unable to buy item";
+            }
+        }
+
+        static string SellFailureMessage(FailureCode code, string displayName)
+        {
+            switch (code)
+            {
+                case FailureCode.InsufficientInventory:
+                case FailureCode.ItemNotFound: return $"No {displayName} to sell";
+                case FailureCode.SystemError: return "Shop system error";
+                default: return $"Unable to sell {displayName}";
+            }
         }
 
         Button EnsureButton(Transform parent, string name, string label, Vector2 position, UnityEngine.Events.UnityAction action)

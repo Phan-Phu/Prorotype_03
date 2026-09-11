@@ -21,8 +21,7 @@ namespace Prototype.Application
 
         const string GameplayLockSource = "inventory";
 
-        /// <summary>True while the panel is open and the mouse is over it — same purpose as
-        /// ToolbarUI.PointerOverUI (PlayerController checks both before firing a world tool-use click).</summary>
+        /// <summary>True while the panel is open and the mouse is over it.</summary>
         public static bool PointerOverUI { get; private set; }
         public bool IsOpen => _open;
 

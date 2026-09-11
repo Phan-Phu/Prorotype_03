@@ -7,8 +7,8 @@ namespace Prototype.Application
 {
     /// <summary>
     /// Headless economy simulation (AGENT_DEV §5.4). Runnable from CLI with no scene, no
-    /// MonoBehaviour — drives the same GameState/ToolController the real game uses (GameState.UseTool /
-    /// PlantSpecific, the exact entry points PlayerController calls), so the sim can never drift from
+    /// MonoBehaviour — drives the same Infrastructure.GameplayService the real game uses
+    /// (UseTool / PlantSpecific, the exact entry points PlayerController calls), so the sim can never drift from
     /// actual gameplay rules the way a hand-rolled spreadsheet formula could.
     ///
     /// Sprint 1 (B4) reason for existing now: the project's new scope adds wood + NPC as a second
@@ -31,7 +31,7 @@ namespace Prototype.Application
         /// each day — harvest whatever's ripe, chop every standing tree it can reach (S2-DEV-07,
         /// stamina permitting), claim new tilled plots up to MaxWorkingPlots (stamina permitting), plant
         /// every bare plot (buying seed from the wallet), water everything planted, sell any wood
-        /// carried, then sleep (GameClock.ForceEndDay via GameState.SkipDay). Returns the run as a CSV
+        /// carried, then sleep (Infrastructure.ClockService.ForceEndDay). Returns the run as a CSV
         /// string (header: day,money,plots,stamina_used,harvested,wood_harvested,wood_income), one row
         /// per simulated day.
         /// </summary>

@@ -164,7 +164,7 @@ namespace Prototype.Application
         /// <summary>
         /// Draws a Sprite via its texture + UV sub-rect. Works uniformly whether the sprite is
         /// Single-mode (UV covers the whole texture) or packed in a multi-sprite atlas (UV is its
-        /// sub-region) — shared by every OnGUI-based screen (ToolbarUI, InventoryScreenUI) so there's
+        /// sub-region) — shared by the remaining IMGUI debug/inventory fallback screens so there's
         /// one place that gets the UV maths right.
         /// </summary>
         public static void DrawSprite(Rect screenRect, Sprite sprite)

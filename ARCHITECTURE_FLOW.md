@@ -83,8 +83,8 @@ Prototype.Infrastructure
         │ reads and mutates raw models through ports
         ▼
 Prototype.Domain
-  Inventory/    Entities/Inventory, Services/IInventoryService and
-                IInventoryReader, ValueObjects/ItemStack
+                Inventory/    Entities/Inventory, Services/IInventoryService and
+                InventoryFailure, ValueObjects/ItemStack
   Entities/     GameState, GridMap, TileData, CropInstance,
                 Wallet, Stamina, GameClock, NPC state
   ValueObjects/ GridCoord, tool result/value types

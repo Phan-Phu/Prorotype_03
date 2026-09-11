@@ -3,7 +3,7 @@ namespace Prototype.Domain
     /// <summary>
     /// Raw fixed-slot inventory state. Behavior is implemented by Infrastructure.InventoryService.
     /// </summary>
-    public class Inventory : IInventoryReader
+    public class Inventory
     {
         public const int Columns = 12;
         public const int Rows = 4;
@@ -18,9 +18,5 @@ namespace Prototype.Domain
 
         public readonly ItemStack[] Slots = new ItemStack[SlotCount];
 
-        int IInventoryReader.SlotCount => Slots.Length;
-
-        ItemStack IInventoryReader.GetSlot(int index)
-            => index < 0 || index >= Slots.Length ? null : Slots[index];
     }
 }

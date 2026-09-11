@@ -120,29 +120,6 @@ namespace Prototype.Application
             return best;
         }
 
-        void OnGUI()
-        {
-            // The authored Canvas is the source of truth. Keep IMGUI only as a safe fallback
-            // for an older scene that has not yet been authored with DialoguePanel.
-            if (_dialoguePanel != null) return;
-
-            var oldContentColor = GUI.contentColor;
-            GUI.contentColor = new Color32(42, 30, 20, 255);
-
-            var dialogue = ReadDialogue();
-            if (dialogue != null && dialogue.IsOpen && _nearby != null)
-            {
-                DrawDialogueBox(_nearby, dialogue.CurrentLine, dialogue.LineIndex + 1, dialogue.LineCount);
-                return;
-            }
-
-            if (_nearby != null)
-            {
-                GUI.Box(ResponsiveUILayout.NpcPromptRect(Screen.width, Screen.height), $"[E] Nói chuyện với {_nearby.DisplayName}");
-            }
-            GUI.contentColor = oldContentColor;
-        }
-
         void UpdateDialogueView()
         {
             var dialogue = ReadDialogue();
@@ -187,29 +164,6 @@ namespace Prototype.Application
         {
             var child = transform.Find(path);
             return child != null ? child.GetComponent<T>() : null;
-        }
-
-        void DrawDialogueBox(NpcDefinition npc, string line, int lineNumber, int lineCount)
-        {
-            Rect box = ResponsiveUILayout.DialogueBoxRect(Screen.width, Screen.height);
-
-            var bg = PlaceholderArt.Art?.DialogueBox;
-            if (bg != null) PlaceholderArt.DrawSprite(box, bg);
-            else GUI.Box(box, string.Empty);
-
-            Rect portrait = new Rect(box.x + 24f, box.y + 24f, 96f, 96f);
-            var portraitSprite = PortraitFor(npc);
-            if (portraitSprite != null) PlaceholderArt.DrawSprite(portrait, portraitSprite);
-            else
-            {
-                GUI.color = npc.FallbackColor;
-                GUI.Box(portrait, string.Empty);
-                GUI.color = Color.white;
-            }
-
-            GUI.Label(new Rect(box.x + 136f, box.y + 20f, 220f, 28f), npc.DisplayName);
-            GUI.Label(new Rect(box.x + 136f, box.y + 52f, box.width - 166f, 64f), line);
-            GUI.Label(new Rect(box.x + box.width - 170f, box.y + box.height - 32f, 150f, 24f), $"E tiếp ({lineNumber}/{lineCount}) | Esc đóng");
         }
 
         static Sprite SpriteFor(NpcDefinition npc)

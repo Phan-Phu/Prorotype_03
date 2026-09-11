@@ -4,7 +4,7 @@ namespace Prototype.Domain
 
     /// <summary>
     /// Inventory item ids for the non-consumable tools (Hoe/WateringCan/Harvest/Axe). GameState grants
-    /// one of each at the start so the hotbar (which now mirrors Inventory row 0 — see ToolbarUI) has
+    /// one of each at the start so the hotbar (which now mirrors Inventory row 0 — see ToolbarCanvasUI) has
     /// something to show; PlayerController resolves whichever item sits in the active slot back to an
     /// action. Seed isn't here: it's not a fixed tool, it's however many turnip_seed/potato_seed stacks
     /// the player is actually carrying (see CropDefinition.SeedItemId).

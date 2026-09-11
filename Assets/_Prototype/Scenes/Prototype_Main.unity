@@ -83041,9 +83041,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1518925396}
   - component: {fileID: 1518925400}
-  - component: {fileID: 1518925401}
   m_Layer: 0
-  m_Name: ToolbarUI
+  m_Name: ToolbarCanvasUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -83081,19 +83080,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5c3a9731d114d804eb7da6b474b802a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Prototype.Application::Prototype.Application.ToolbarCanvasUI
-  Player: {fileID: 0}
---- !u!114 &1518925401
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1518925395}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 347ceabafa4c265438345ebe60d967b4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Prototype.Application::Prototype.Application.ToolbarUI
   Player: {fileID: 0}
 --- !u!1 &1523969440
 GameObject:

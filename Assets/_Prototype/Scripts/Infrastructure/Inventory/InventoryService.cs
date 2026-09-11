@@ -37,9 +37,6 @@ namespace Prototype.Infrastructure
 
         public InventorySlotData[] Read() => Read(_boundInventory);
 
-        public UniTask<InventorySlotData[]> ReadAsync(Inventory inventory)
-            => UniTask.FromResult(Read(inventory));
-
         public UniTask<Result<InventoryFailure, Unit>> Add(Inventory inventory, string itemId, int amount = 1)
             => UniTask.FromResult(SafeAdd(inventory, itemId, amount));
 

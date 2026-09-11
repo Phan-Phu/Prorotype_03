@@ -60,12 +60,12 @@ namespace Prototype.Infrastructure
         public Sprite CursorInvalid;
 
         /// <summary>
-        /// Hotbar UI (ToolbarUI). Icons visually identified from tools.png (a tiered tool-in-hand
+        /// Hotbar UI (ToolbarCanvasUI). Icons visually identified from tools.png (a tiered tool-in-hand
         /// sheet, not a plain icon set — most of it is unusable as a flat icon) and confirmed by
         /// exporting a magnified contact sheet: tools_21 = hoe, tools_63 = watering can, tools_252 =
         /// a harvest basket (no sickle exists in the sheet, a basket is the closest fit). Seed uses a
         /// dedicated seed-bag asset instead since tools.png has none. Order matches ToolType enum
-        /// (Hoe, Seed, WateringCan, Harvest) so ToolbarUI can index it directly.
+        /// (Hoe, Seed, WateringCan, Harvest) so the toolbar can index it directly.
         /// </summary>
         public Sprite[] ToolIcons;
 

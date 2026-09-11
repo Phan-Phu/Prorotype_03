@@ -17,7 +17,7 @@ namespace Prototype.Application
         public IGameWorldService WorldService;     // Infrastructure world query boundary
 
         /// <summary>
-        /// Index into State.InventorySystem.Slots (0-9 = row 0, the hotbar row ToolbarUI shows). This
+        /// Index into State.InventorySystem.Slots (0-9 = row 0, the hotbar row ToolbarCanvasUI shows). This
         /// replaces a fixed ToolType selection: whatever item sits in the active slot IS the tool now
         /// — select a slot (1-9, 0 for the 10th) or click it on the hotbar, same as picking up an item.
         /// </summary>

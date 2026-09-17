@@ -1,8 +1,8 @@
 # Architecture flow — Farming Prototype
 
-This document describes the current implementation in the `dev` branch. It is
-not a target architecture: the flow below is based on the classes and scene
-that actually exist in the project.
+This document describes the current implementation on `main` (`dev` currently
+points at the same commit). It is not a target architecture: the flow below
+is based on the classes and scene that actually exist in the project.
 
 ## 0. High-level runtime flow
 
@@ -63,16 +63,20 @@ Unity scene / Unity lifecycle
         ▼
 Prototype.Application
   Inventory/         InventoryService bindings, InventorySlotData,
-                     ToolbarCanvasUI, InventoryScreenUI
+                     ToolbarCanvasUI, InventoryScreenUI, InventorySlotView,
+                     ItemDetailPopup
   Components/Mapping GenericMapper for raw-to-application projections
   Gameplay/          IGameplayService and action/shop DTOs
   Dialogue/          IDialogueService and DialogueDto
   State/             IClockService, IGameWorldService, state/time DTOs
+  UI/Popup/          PopupBase, PopupParent — shared popup open/close,
+                     animation and stacking used by every scene popup
+  UI/                HUD, SeedShopUI, ResponsiveUILayout
   GameManager          composition root and runtime bootstrap
   PlayerController     input, movement, active-slot actions
   WorldView            world rendering
   HUD                 HUD rendering
-  SeedShopUI           UGUI shop and shop actions
+  SeedShopUI           UGUI shop popup (PopupBase) and shop actions
   NpcDialogueController NPC interaction and dialogue presentation
   DebugPanel           debug-only controls
         │ calls Infrastructure only
@@ -80,25 +84,35 @@ Prototype.Application
 Prototype.Infrastructure
   InventoryService / UniTask + typed Result implementations
   ClockService / GameplayService / DialogueService
-  MasterDataCsvImporter / MasterDataAsset / validation + mapping
+  MasterDataCsvImporter / MasterDataAsset (+ MasterDataImporter) / validation + mapping
   GameStateApplicationService / repository adapters
   ArtCatalog / PlaceholderArt / SessionLogger
         │
         │ reads and mutates raw models through ports
         ▼
 Prototype.Domain
-                Inventory/    Entities/Inventory, Services/IInventoryService and
-                InventoryFailure, ValueObjects/ItemStack
-  Entities/     GameState, GridMap, TileData, CropInstance,
-                Wallet, Stamina, GameClock, NPC state
-  ValueObjects/ GridCoord, tool result/value types
-  Policies/      BalanceConfig, crop/tree definitions
+  Inventory/     Entities/Inventory, Services/IInventoryService +
+                 InventoryFailure, ValueObjects/ItemStack
+  Contracts/     Result, FailureCode, GameplayFailure, ShopResults, ToolResult
+  Dialogue/Services  DialogueFailure
+  MasterData/    MasterDataFailure, MasterDataSnapshot
+  State/Services ClockFailure, RepositoryFailure, StateFailure
+  World/Services WorldFailure
+  Entities/      GameState, GridMap, TileData, CropInstance,
+                 Wallet, Stamina, GameClock, NpcDefinition, DialogueState
+  ValueObjects/  GridCoord, ToolType
+  Policies/      BalanceConfig, CropDefinition, TreeDefinition
   Ports/         IGameStateRepository
 ```
 
-Inventory is intentionally a Domain feature folder. `IInventoryService` is a
-Domain port whose operations return UniTask directly (`Add`, `Remove`, `Count`,
-etc.); there are no duplicate `*Async` methods. The implementation is
+Inventory is intentionally a Domain feature folder, and the same feature-folder
+pattern now covers the rest of Domain: each feature (`Dialogue`, `MasterData`,
+`State`, `World`) keeps its own `Services/<Feature>Failure` type next to the
+shared `Contracts/` result plumbing (`Result<TFailure, TValue>`, `FailureCode`,
+`GameplayFailure`, `ShopResults`, `ToolResult`), instead of one flat
+`Entities/`+`Policies/` bucket. `IInventoryService` is a Domain port whose
+operations return UniTask directly (`Add`, `Remove`, `Count`, etc.); there are
+no duplicate `*Async` methods. The implementation is
 `Infrastructure/Inventory/InventoryService`. The same Infrastructure class
 exposes destination-typed projections through its generic mapper usage and
 returns `InventorySlotData[]` directly to the inventory UI. There is no
@@ -129,6 +143,14 @@ references for UI.
 The physical folders under `Assets/_Prototype/Scripts/Application/` are only
 for navigation (`UI`, `Player`, `NPC`, `World`, `Debug`, etc.). They are not
 separate architectural layers.
+
+Application UI components have moved from resolving scene children at
+runtime (`transform.Find("Panel/Child")`) toward serialized `[SerializeField]`
+references assigned in the Inspector — `HUD`, `WorldView`, `NpcDialogueController`
+and every `PopupBase` popup now follow this pattern, logging a warning instead
+of silently failing when a reference is unassigned. `AuthorUiHierarchy` is the
+one-shot editor command that built the corresponding hierarchy into
+`Prototype_Main.unity`.
 
 ## 2. Composition and startup flow
 
@@ -241,7 +263,7 @@ read active Inventory slot
 resolve item to action
       ├─ Hoe / WateringCan / Harvest / Axe → GameplayService.UseTool()
       ├─ Turnip/Potato seed                → GameplayService.PlantSpecific()
-      └─ interaction tile                  → SeedShopUI.OpenCurrent()
+      └─ interaction tile                  → Player.ShopUI?.OpenShop()
       ↓
 Infrastructure validates tile, stamina, inventory and object state
       ↓
@@ -265,9 +287,9 @@ sequenceDiagram
     participant I as Inventory
     participant W as Wallet
 
-    P->>V: OpenCurrent()
-    V->>V: open ShopPanel, clear selected item, lock gameplay
-    V->>V: list Turnip Seed and Potato Seed
+    P->>V: ShopUI.OpenShop()
+    V->>V: ShowPopup() (PopupBase), clear selected item, lock gameplay
+    V->>V: BuildItemList() — clone _itemButtonTemplate per State.MasterData.Crops entry
     P->>V: select item
     V->>V: show detail, price and owned count
     P->>V: BuySelectedItem()
@@ -278,15 +300,53 @@ sequenceDiagram
     V->>V: show feedback and refresh price/owned count
 ```
 
-`SeedShopUI` is a UGUI component. It currently ensures the shop controls under
-the scene-authored `ShopPanel` at runtime (`TitleText`, `ItemListPanel`,
-`DetailPanel`, `PurchasePanel`, `BuyButton`, and `CloseButton`). Its public
-Inspector-callable entry points are:
+`SeedShopUI` is a UGUI component and derives from `PopupBase` (see §6a),
+sharing the same `PopupParent` stack as `InventoryScreenUI` and
+`ItemDetailPopup`. Its `SeedShopPopup` hierarchy (`TitleText`, `ItemListUI`,
+`ItemDetailUI`, `PurchaseUI`, `CloseButton`) is fully scene-authored and
+wired through serialized `[SerializeField]` references — GameManager/
+SeedShopUI never create or "ensure" these controls at runtime; the one-shot
+editor command `AuthorUiHierarchy` (menu-driven, under
+`Assets/_Prototype/Editor/`) is what built that hierarchy into
+`Prototype_Main.unity`. `SeedShopPopup` itself is a flat white/near-white
+UGUI panel (`Image.type = Simple`, no sprite) — every sub-panel used to share
+a one-off NPC-dialogue composite sprite via `Image.type = Sliced`, which had
+no 9-slice border to slice by and rendered nested, distorted copies of the
+whole picture at every panel's own size; the flat-fill panels avoid that
+entirely and keep text legible.
+
+The item list is Master-Data-driven, not hardcoded per crop: only one
+`_itemButtonTemplate` button is authored (inactive by default). At runtime,
+`BuildItemList()` clones it once per entry in `State.MasterData.Crops`, sets
+its label from `SeedItemId`/`SeedPrice`, and wires its `onClick` to
+`Select(crop.Id)` — adding a row to Master Data is enough to add an entry to
+the shop, no per-crop button or per-crop method. `ShowItemDetail(string)`
+looks up the matching crop by scanning `State.MasterData.Crops` for a
+`SeedItemId` match, the same generic way, instead of per-crop `if` branches.
+
+`OpenShop()`/`CloseShop()` call the inherited `ShowPopup()`/`HidePopup()`,
+which animate the popup's scale (via `iTween` if present, otherwise a
+fallback coroutine tween) and lock/unlock player input through
+`Player.SetGameplayLocked`. Its public Inspector-callable entry points are:
 
 - `ListItems`, `ListItem(string)`
-- `ListTurnipSeed`, `ListPotatoSeed`
-- `ShowItemDetail(string)`, `ShowTurnipSeedDetail`, `ShowPotatoSeedDetail`
-- `BuySelectedItem`, `BuyTurnipItem`, `BuyPotatoItem`
+- `ShowItemDetail(string)`
+- `BuySelectedItem`, `BuyTurnipItem`, `BuyPotatoItem` (direct compat entry
+  points kept for existing callers/tests; not part of the generated list)
+
+`SeedShopUI` has no public static `Instance` and no static `IsOpen`/
+`PointerOverUI` — those are inherited/declared as ordinary instance members
+from `PopupBase`. Its Domain/Infrastructure dependency fields
+(`State`, `MasterDataAsset`, `GameplayService`, `InventoryService`, `Player`)
+are `internal`, assignable only by `GameManager` (composition root, same
+assembly). Other components that need to query the shop
+(`PlayerController`, `InventoryScreenUI`, `DebugPanel`) hold an explicit
+`internal SeedShopUI ShopUI` field wired by `GameManager` in
+`SetupSeedShop()`/`SetupDebug()`, instead of reaching for a singleton. This
+composition-root-wires-references pattern (rather than a static `Instance`
+per UI script) is now the convention for every UI component except
+`GameManager` itself, which is the one script important enough to justify
+its own static `Instance` (used by `GameManager.SpawnFeedback`).
 
 The Infrastructure transaction is atomic with respect to insufficient funds
 and full inventory: it validates before changing Domain raw state.
@@ -316,6 +376,50 @@ return `Result<InventoryFailure, TValue>`, so callers can distinguish `Inventory
 `InsufficientInventory`, `LockedSlot`, `NotInitialized` and `SystemError`
 without parsing UI text.
 
+`InventoryScreenUI` (the `I` popup) is a `PopupBase` controller that resolves
+its scene-authored panel, opens/closes it, and locks gameplay input while
+open (`Player.SetGameplayLocked`) — the 48-slot grid (12x4, matching the
+toolbar's pixel-perfect scale) is scene-authored by
+`AuthorUiHierarchy.BuildInventoryGrid()`, not runtime-built. Each cell is an
+`InventorySlotView` (`RequireComponent(Image)`): a dumb view + pointer/drag
+surface whose `SlotIndex` is assigned once by the authoring script and
+matches the Domain `Inventory.Slots` index it represents.
+`InventoryScreenUI` pushes `SetContent(itemId, count, icon, tint, hideIcon)`
+into every slot each frame while the popup is open, and owns the actual
+`InventoryService.Swap` call, the shared drag-ghost image, and hover/drop
+handling — `InventorySlotView` only forwards pointer events
+(`IBeginDragHandler`/`IDragHandler`/`IEndDragHandler`/`IDropHandler`) back to
+it. `ToolbarCanvasUI` and `InventoryScreenUI` both call
+`ItemDetailPopup.Hide(this)` when a pointer leaves a slot so a stale tooltip
+never lingers; a slot's pointer-enter calls `ItemDetailPopup.Show(itemId,
+count, mousePosition, source)` to show that item's hover tooltip (see §6a).
+
+### 6a. Popup framework (PopupBase / PopupParent)
+
+```text
+Application/UI/Popup/
+  PopupBase     open/close lifecycle, scale animation (iTween ▸ fallback
+                coroutine tween), OnPopupShown/OnPopupHidden hooks
+  PopupParent   per-canvas popup stack; Show() brings a popup to front,
+                HideAll() closes every registered popup
+
+extend PopupBase, share one PopupParent:
+  InventoryScreenUI, SeedShopUI, NpcDialogueController, ItemDetailPopup
+```
+
+Every scene popup — the inventory panel, the seed shop panel, the NPC
+dialogue panel and the item-detail hover tooltip (`ItemDetailPopup`) —
+derives from `PopupBase` and
+registers with the scene's `PopupParent`. `PopupParent.Show()` re-parents the
+popup to the last sibling so the most recently opened popup renders on top,
+and `HideAll()` gives one place to close every open popup (used by input
+locks and screen transitions). `ItemDetailPopup` additionally positions
+itself next to the cursor, clamped to stay on-screen, and resolves its
+content (`DisplayName`, `Description`, icon) from `GameManager.Instance.MasterData`.
+This popup hierarchy was authored into `Prototype_Main.unity` by the one-shot
+editor command `AuthorUiHierarchy` (`Assets/_Prototype/Editor/AuthorUiHierarchy.cs`);
+it is not rebuilt at runtime.
+
 ## 7. NPC dialogue flow
 
 ```text
@@ -330,9 +434,14 @@ advance line or close at final line
 close early and unlock gameplay
 ```
 
-NPC definitions and dialogue state live in `Prototype.Domain`. The controller
-owns proximity, input and presentation. There are no quests, branching choices,
-relationship values or schedules in the current implementation.
+NPC definitions and dialogue state live in `Prototype.Domain`. `NpcDialogueController`
+also derives from `PopupBase` (its `DialoguePopup` panel, portrait, speaker
+and dialogue text are serialized scene references, no longer found at runtime
+via `transform.Find`), so opening/closing dialogue reuses the same
+show/hide-with-animation path as the inventory and seed shop popups (§6a). The
+controller owns proximity, input and presentation. There are no quests,
+branching choices, relationship values or schedules in the current
+implementation.
 
 ## 8. Art and infrastructure flow
 

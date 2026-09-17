@@ -11,6 +11,8 @@ namespace Prototype.Application
     public class WorldView : MonoBehaviour
     {
         public GameState State;
+        [Header("Editor-authored world root")]
+        [SerializeField] Transform _worldRoot;
         private SpriteRenderer[,] _tiles;
         private Sprite[,] _baseTiles;
         private SpriteRenderer[,] _crops;   // real art (ParsnipCrop stages) drawn above the tile square
@@ -72,9 +74,12 @@ namespace Prototype.Application
 
         SpriteRenderer FindOrCreateRenderer(string objectName)
         {
-            var child = transform.Find(objectName);
-            var go = child != null ? child.gameObject : new GameObject(objectName);
-            if (go.transform.parent != transform) go.transform.SetParent(transform, false);
+            var root = _worldRoot != null ? _worldRoot : transform;
+            foreach (var existing in root.GetComponentsInChildren<SpriteRenderer>(true))
+                if (existing.gameObject.name == objectName) return existing;
+
+            var go = new GameObject(objectName);
+            go.transform.SetParent(root, false);
             return go.GetComponent<SpriteRenderer>() ?? go.AddComponent<SpriteRenderer>();
         }
 

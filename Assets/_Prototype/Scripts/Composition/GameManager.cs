@@ -14,6 +14,8 @@ namespace Prototype.Application
     /// </summary>
     public class GameManager : MonoBehaviour
     {
+        [Header("Editor-authored scene references")]
+        [SerializeField] GameObject _seedShopSign;
         public static GameManager Instance { get; private set; }
         public GameState State { get; private set; }
         public MasterDataSnapshot MasterData { get; private set; }
@@ -34,7 +36,7 @@ namespace Prototype.Application
         {
             // Prototype_Main can author the composition root in the scene. Do not create a
             // second runtime root when that scene already contains one.
-            if (FindFirstObjectByType<GameManager>() != null) return;
+            if (FindAnyObjectByType<GameManager>() != null) return;
             var go = new GameObject("GameManager");
             go.AddComponent<GameManager>();
         }
@@ -132,7 +134,7 @@ namespace Prototype.Application
             // whose default Skybox clear flags painted over the whole game (blue screen, nothing
             // else visible). Find every camera in the scene, reuse the first one, and remove any
             // extras so there is always exactly one camera driving the view.
-            var cams = FindObjectsByType<Camera>(FindObjectsSortMode.None);
+            var cams = FindObjectsByType<Camera>();
             Camera cam;
             if (cams.Length == 0)
             {
@@ -156,7 +158,7 @@ namespace Prototype.Application
 
         void SetupWorldView()
         {
-            var wv = FindFirstObjectByType<WorldView>();
+            var wv = FindAnyObjectByType<WorldView>();
             if (wv == null)
             {
                 var go = new GameObject("WorldView");
@@ -213,7 +215,7 @@ namespace Prototype.Application
 
         void SetupPlayer()
         {
-            _player = FindFirstObjectByType<PlayerController>();
+            _player = FindAnyObjectByType<PlayerController>();
             if (_player == null)
             {
                 var go = new GameObject("Player");
@@ -226,7 +228,7 @@ namespace Prototype.Application
 
         void SetupHud()
         {
-            var hud = FindFirstObjectByType<HUD>();
+            var hud = FindAnyObjectByType<HUD>();
             if (hud == null)
             {
                 var go = new GameObject("HUD");
@@ -239,7 +241,7 @@ namespace Prototype.Application
         void SetupToolbar()
         {
             // NavigationBar is scene-authored; only bind gameplay state to its existing component.
-            var bar = FindFirstObjectByType<ToolbarCanvasUI>();
+            var bar = FindAnyObjectByType<ToolbarCanvasUI>();
             if (bar != null)
             {
                 bar.Player = _player;
@@ -249,7 +251,7 @@ namespace Prototype.Application
 
         void SetupInventoryScreen()
         {
-            var inv = FindFirstObjectByType<InventoryScreenUI>();
+            var inv = FindAnyObjectByType<InventoryScreenUI>();
             if (inv == null)
             {
                 var go = new GameObject("InventoryScreenUI");
@@ -263,8 +265,12 @@ namespace Prototype.Application
 
         void SetupSeedShop()
         {
-            var sign = GameObject.Find("SeedShopSign");
-            if (sign == null) sign = new GameObject("SeedShopSign");
+            var sign = _seedShopSign;
+            if (sign == null)
+            {
+                Debug.LogError("GameManager is missing the serialized SeedShopSign reference.");
+                return;
+            }
             var sr = sign.GetComponent<SpriteRenderer>() ?? sign.AddComponent<SpriteRenderer>();
             var turnipData = State.MasterData.GetCrop(Prototype.Domain.CropId.Turnip);
             string turnipSeed = turnipData != null
@@ -284,7 +290,7 @@ namespace Prototype.Application
             sr.transform.localScale = new Vector3(0.8f, 0.8f, 1f);
             sr.sortingOrder = 4;
 
-            var shop = FindFirstObjectByType<SeedShopUI>();
+            var shop = FindAnyObjectByType<SeedShopUI>();
             if (shop == null)
             {
                 var label = new GameObject("SeedShopUI");
@@ -295,11 +301,14 @@ namespace Prototype.Application
             shop.GameplayService = _services.GetRequiredService<IGameplayService>();
             shop.InventoryService = _services.GetRequiredService<Prototype.Domain.IInventoryService>();
             shop.Player = _player;
+            _player.ShopUI = shop;
+            var inv = FindAnyObjectByType<InventoryScreenUI>();
+            if (inv != null) inv.ShopUI = shop;
         }
 
         void SetupNpcDialogue()
         {
-            var npc = FindFirstObjectByType<NpcDialogueController>();
+            var npc = FindAnyObjectByType<NpcDialogueController>();
             if (npc == null)
             {
                 var go = new GameObject("NpcDialogueController");
@@ -312,7 +321,7 @@ namespace Prototype.Application
 
         void SetupDebug()
         {
-            _debug = FindFirstObjectByType<DebugPanel>();
+            _debug = FindAnyObjectByType<DebugPanel>();
             if (_debug == null)
             {
                 var go = new GameObject("DebugPanel");
@@ -324,6 +333,7 @@ namespace Prototype.Application
             _debug.GameplayService = _services.GetRequiredService<IGameplayService>();
             _debug.WorldService = _worldService;
             _debug.Player = _player;
+            _debug.ShopUI = FindAnyObjectByType<SeedShopUI>();
         }
 
         /// <summary>Flash a feedback square over a tile (AGENT_DESIGN §5.4 Feel Matrix). Pure visual cue.</summary>

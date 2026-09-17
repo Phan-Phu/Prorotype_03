@@ -15,6 +15,7 @@ namespace Prototype.Application
         public GameState State;                    // set by GameManager
         public IGameplayService GameplayService;  // Infrastructure behavior boundary
         public IGameWorldService WorldService;     // Infrastructure world query boundary
+        internal SeedShopUI ShopUI;                // set by GameManager; replaces the old static singleton lookup
 
         /// <summary>
         /// Index into State.InventorySystem.Slots (0-9 = row 0, the hotbar row ToolbarCanvasUI shows). This
@@ -107,7 +108,7 @@ namespace Prototype.Application
             bool clickInWorld = Input.GetMouseButtonDown(0)
                 && !ToolbarCanvasUI.PointerOverUI
                 && !InventoryScreenUI.PointerOverUI
-                && !SeedShopUI.PointerOverUI
+                && !(ShopUI != null && ShopUI.PointerOverUI)
                 && !Prototype.Application.DebugPanel.PointerOverUI;
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || clickInWorld)
                 TryUseActiveToolForInput();
@@ -250,7 +251,7 @@ namespace Prototype.Application
 
         void UseTool()
         {
-            if (SeedShopUI.IsOpen) return;
+            if (ShopUI != null && ShopUI.IsOpen) return;
 
             GridCoord coord = TargetCoord();
             bool isShopTile = false;
@@ -261,7 +262,7 @@ namespace Prototype.Application
             }
             if (isShopTile)
             {
-                SeedShopUI.OpenCurrent();
+                ShopUI?.OpenShop();
                 GameManager.SpawnFeedback(coord, FeedbackKind.Plant);
                 return;
             }

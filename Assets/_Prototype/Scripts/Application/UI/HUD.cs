@@ -10,11 +10,12 @@ namespace Prototype.Application
     {
         public IGameStateQuery StateQuery;
         public PlayerController Player;
-        private Text _dateTimeText;
+        [SerializeField] Text _dateTimeText;
 
         void Awake()
         {
-            _dateTimeText = transform.Find("DateTimePanel/DateTimeText")?.GetComponent<Text>();
+            if (_dateTimeText == null)
+                Debug.LogWarning("HUD is missing the serialized DateTimeText reference. Assign it in HUDUI.");
         }
 
         void Update()

@@ -61,7 +61,9 @@ namespace Prototype.Application
 
         static string ReadCsv(string fileName)
         {
-            var projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            // This class lives in Prototype.Application, so an unqualified Application resolves to
+            // the project namespace instead of UnityEngine.Application. Keep the editor API explicit.
+            var projectRoot = Directory.GetParent(UnityEngine.Application.dataPath).FullName;
             var path = Path.Combine(projectRoot, CsvFolder, fileName).Replace('\\', '/');
             if (!File.Exists(path)) throw new FileNotFoundException("Master Data CSV is missing", path);
             return File.ReadAllText(path);

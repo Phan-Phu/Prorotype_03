@@ -9,12 +9,13 @@ Unity top-down farming prototype focused on the core loop:
 - Unity: `6000.4.0f1`
 - Main scene: `Assets/_Prototype/Scenes/Prototype_Main.unity`
 - Runtime source: `Assets/_Prototype/Scripts/`
-- Packages: `Packages/manifest.json`
+- Packages: `Packages/manifest.json` (UniTask, Microsoft DI, iTween for popup
+  animation, test-helper.ui)
 - Project settings: `ProjectSettings/`
 
-The `dev` branch is the developer source branch. Design notes, QA reports,
-Hermes/Kanban data, agent prompts, templates and generated artifacts are kept
-outside this repository.
+The `main` branch is the developer source branch (`dev` currently points at
+the same commit). Design notes, QA reports, Hermes/Kanban data, agent prompts,
+templates and generated artifacts are kept outside this repository.
 
 ## Architecture
 
@@ -22,6 +23,13 @@ outside this repository.
   no Unity UI or application read models. Inventory ports return `UniTask`
   directly (`Add`, `Remove`, `Count`, etc.); there are no duplicate `*Async`
   methods. Setters are kept for MasterData import/runtime composition only.
+  Domain is organized by feature folder rather than one flat `Entities/`
+  bucket: `Inventory/`, `Contracts/` (`Result`, `FailureCode`, `GameplayFailure`,
+  `ShopResults`, `ToolResult`), `Dialogue/Services` (`DialogueFailure`),
+  `MasterData/` (`MasterDataFailure`, `MasterDataSnapshot`), `State/Services`
+  (`ClockFailure`, `RepositoryFailure`, `StateFailure`) and `World/Services`
+  (`WorldFailure`) each carry their own failure/result types next to
+  `Entities/`, `Policies/`, `Ports/` and `ValueObjects/`.
 - `Prototype.Application`: the merged UI/controller layer (Presentation was
   intentionally removed). It receives input, binds scene-authored UI and
   consumes Infrastructure services/DTOs.
@@ -31,7 +39,8 @@ outside this repository.
   their contracts and typed results.
 - Runtime balance and content are authored in
   `Assets/_Prototype/MasterData/CSV/` and imported into
-  `Assets/_Prototype/Resources/MasterData.asset`. `MasterDataImporter` validates
+  `Assets/_Prototype/Resources/MasterData.asset`. `MasterDataImporter`
+  (a static helper in `Infrastructure/MasterData/MasterDataAsset.cs`) validates
   that asset and converts it to the immutable Domain `MasterDataSnapshot` before
   `GameState` is created. Player/time/tool costs, crops, trees, starting items,
   NPC dialogue, item descriptions and item art references therefore have one
@@ -58,7 +67,28 @@ outside this repository.
   methods for Inventory, Gameplay, NPC dialogue, clock, world and persistence.
 - UI is UGUI-based. Scene-authored objects provide the layout; application
   components bind state and user intent at runtime.
-- The main scene owns the authored canvas and toolbar hierarchy.
+- The main scene owns the authored canvas, toolbar and popup hierarchy. Popups
+  (inventory, seed shop, item detail tooltip) are scene-authored GameObjects
+  bound through serialized fields — not built at runtime. `Application/UI/Popup/`
+  holds the shared `PopupBase`/`PopupParent` open-close/animation/stacking
+  framework; `InventoryScreenUI`, `SeedShopUI` and `ItemDetailPopup` derive from
+  `PopupBase` and share one `PopupParent` stack so only one popup animates to
+  front at a time. Show/hide animation uses `iTween` when present in the
+  project and falls back to a plain coroutine scale-tween otherwise.
+- The inventory popup renders a 48-slot grid (12x4) authored by
+  `AuthorUiHierarchy.BuildInventoryGrid()`; each cell is an `InventorySlotView`
+  (hover tooltip + drag-and-drop swap), driven every frame by
+  `InventoryScreenUI`. The seed shop's item list is Master-Data-driven: one
+  authored button template is cloned once per `State.MasterData.Crops` entry,
+  so adding a crop row to Master Data is enough to add it to the shop — no
+  per-crop button or per-crop code.
+- UI/Application components are wired by `GameManager` through explicit
+  `[SerializeField]`/`internal` fields assigned at composition time, not
+  through static `Instance` singletons — e.g. `PlayerController`,
+  `InventoryScreenUI` and `DebugPanel` each hold an `internal SeedShopUI
+  ShopUI` reference instead of a static `SeedShopUI.Instance` lookup.
+  `GameManager` itself is the one script that keeps a static `Instance`,
+  reserved for the composition root.
 
 The runtime dependency direction is:
 
@@ -97,7 +127,7 @@ For a headless compile check:
 
 ## Developer workflow
 
-- Work on branch `dev`.
+- Work on branch `main`.
 - Keep Unity assets, scene files, packages and developer source tracked.
 - Keep generated output and test/agent/design material outside the repository.
 - Compile with Unity CLI before pushing.
@@ -105,9 +135,13 @@ For a headless compile check:
 
 ## Master Data workflow
 
-1. Edit the CSV files under `Assets/_Prototype/MasterData/CSV/`.
+1. Edit the CSV files under `Assets/_Prototype/MasterData/CSV/` (`player.csv`,
+   `time.csv`, `tools.csv`, `crops.csv`, `tree.csv`, `items.csv`,
+   `starting_inventory.csv`, `npcs.csv`).
 2. Select `Prototype/Master Data/Import CSV to Scriptable Asset` in the Unity
-   editor. The Infrastructure converter parses the CSV, validates it, resolves
+   editor (`Prototype/Master Data/Create or Reset Prototype Asset` creates the
+   asset from CSV the first time). The Infrastructure converter
+   (`MasterDataCsvImporter`) parses the CSV, validates it, resolves
    `IconPath` + `IconSpriteName` through the editor asset database, and writes
    the result to the ScriptableObject.
 3. Use `Assets/_Prototype/Resources/MasterData.asset` to review or fine-tune

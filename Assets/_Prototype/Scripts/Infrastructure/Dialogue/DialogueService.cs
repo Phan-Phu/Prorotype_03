@@ -52,16 +52,16 @@ namespace Prototype.Infrastructure
                 return ToDto();
             });
 
-        async UniTask<Result<DialogueFailure, DialogueDto>> Safe(string context, Func<DialogueDto> operation)
+        UniTask<Result<DialogueFailure, DialogueDto>> Safe(string context, Func<DialogueDto> operation)
         {
             try
             {
-                return ResultFactory.Success<DialogueFailure, DialogueDto>(operation());
+                return UniTask.FromResult(ResultFactory.Success<DialogueFailure, DialogueDto>(operation()));
             }
             catch (Exception exception)
             {
                 UnityEngine.Debug.LogException(exception);
-                return ResultFactory.Failure<DialogueFailure, DialogueDto>(DialogueFailure.System(context));
+                return UniTask.FromResult(ResultFactory.Failure<DialogueFailure, DialogueDto>(DialogueFailure.System(context)));
             }
         }
 

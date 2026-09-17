@@ -9,31 +9,32 @@ namespace Prototype.Application
     /// Runtime-only view/controller for DEV-041 static NPCs. It owns only presentation and keyboard
     /// input; dialogue content/positions live in plain C# NpcDefinition/DialogueState for CLI tests.
     /// </summary>
-    public class NpcDialogueController : MonoBehaviour
+    public class NpcDialogueController : PopupBase
     {
         public GameState State;
         public IDialogueService DialogueService;
         public PlayerController Player;
 
+        [Header("DialoguePopup UI")]
+        [SerializeField] RectTransform _dialoguePopup;
+        [SerializeField] Image _dialoguePanel;
+        [SerializeField] Image _portraitImage;
+        [SerializeField] Text _speakerText;
+        [SerializeField] Text _dialogueText;
+        [SerializeField] Text _advanceText;
+
         private NpcDefinition _nearby;
-        private Image _dialoguePanel;
-        private Image _portraitImage;
-        private Text _speakerText;
-        private Text _dialogueText;
-        private Text _advanceText;
 
         NpcDefinition[] Npcs => State?.MasterData?.Npcs ?? NpcDefinitions.All;
 
         public bool IsDialogueOpen => ReadDialogue()?.IsOpen == true;
 
-        void Awake()
+        protected override void Awake()
         {
-            // DialoguePanel is authored in the scene. Runtime only binds content/state to it.
-            _dialoguePanel = FindChild<Image>("DialoguePanel");
-            _portraitImage = FindChild<Image>("DialoguePanel/Portrait");
-            _speakerText = FindChild<Text>("DialoguePanel/SpeakerText");
-            _dialogueText = FindChild<Text>("DialoguePanel/DialogueText");
-            _advanceText = FindChild<Text>("DialoguePanel/AdvanceText");
+            base.Awake();
+            if (_dialoguePopup == null || _dialoguePanel == null || _portraitImage == null ||
+                _speakerText == null || _dialogueText == null || _advanceText == null)
+                Debug.LogWarning("NpcDialogueController is missing serialized DialoguePopup references. Assign them in the scene.");
 
             SetDialogueVisible(false);
             SetDialogueTextColor(new Color32(42, 30, 20, 255));
@@ -143,10 +144,16 @@ namespace Prototype.Application
             }
         }
 
+        protected override RectTransform ResolvePopupTarget()
+        {
+            return _dialoguePopup;
+        }
+
         void SetDialogueVisible(bool visible)
         {
-            if (_dialoguePanel != null && _dialoguePanel.gameObject.activeSelf != visible)
-                _dialoguePanel.gameObject.SetActive(visible);
+            if (_dialoguePanel == null) return;
+            if (visible) ShowPopup();
+            else HidePopup();
         }
 
         void SetDialogueTextColor(Color color)
@@ -161,12 +168,6 @@ namespace Prototype.Application
             if (DialogueService == null) return null;
             var result = DialogueService.Read().GetAwaiter().GetResult();
             return result.IsSuccess ? result.Value : null;
-        }
-
-        T FindChild<T>(string path) where T : Component
-        {
-            var child = transform.Find(path);
-            return child != null ? child.GetComponent<T>() : null;
         }
 
         static Sprite SpriteFor(NpcDefinition npc)

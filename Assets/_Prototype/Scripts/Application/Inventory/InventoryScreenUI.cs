@@ -1,164 +1,162 @@
-using Prototype.Application;
 using Prototype.Domain;
 using Prototype.Infrastructure;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace Prototype.Application
 {
     /// <summary>
-    /// Full inventory grid (real art: InventoryPlayer.png — a 10-slot hotbar row + 3x10 backpack
-    /// grid, 40 slots total, matching Inventory.SlotCount exactly). Toggle with I. Drag an item onto
-    /// another slot to swap their positions (Inventory.Swap) — the ask this screen exists to satisfy.
+    /// Controller for the editor-authored InventoryPopup. The static container and 48-slot grid
+    /// (InventorySlotView per cell) are scene objects; this class opens/closes the popup, pushes
+    /// InventoryService read data into each slot every frame while open, and owns the one shared
+    /// drag-to-swap gesture (a slot can only ever report into its owning InventoryScreenUI).
     /// </summary>
-    public class InventoryScreenUI : MonoBehaviour
+    public sealed class InventoryScreenUI : PopupBase
     {
+        public static InventoryScreenUI Instance { get; private set; }
+
+        [SerializeField] RectTransform panel;
+        [Header("Drag ghost (follows the cursor while dragging an item)")]
+        [SerializeField] Image _dragGhost;
+
         public GameState State;
         public IInventoryService InventoryService;
         public InventoryService InventoryReadService;
         public PlayerController Player;
-        private bool _open;
-        private int _dragSlot = -1;
+        internal SeedShopUI ShopUI;                // set by GameManager; replaces the old static singleton lookup
 
         const string GameplayLockSource = "inventory";
 
-        /// <summary>True while the panel is open and the mouse is over it.</summary>
+        /// <summary>Reserved for the inventory slot views to set while their pointer is inside.</summary>
         public static bool PointerOverUI { get; private set; }
-        public bool IsOpen => _open;
 
-        const float Scale = ResponsiveUILayout.InventoryMaxScale; // max zoom; scales down for small windows
-        const int PanelNativeW = (int)ResponsiveUILayout.InventoryNativeW, PanelNativeH = (int)ResponsiveUILayout.InventoryNativeH;
-        const int Cols = Prototype.Domain.Inventory.Columns;
-        const int Rows = Prototype.Domain.Inventory.Rows;
+        InventorySlotView[] _slots;
+        int _dragSlot = -1;
+
+        protected override RectTransform ResolvePopupTarget() => panel;
+
+        protected override void Awake()
+        {
+            base.Awake();
+            Instance = this;
+            if (panel == null)
+                Debug.LogError("InventoryPopup is missing its serialized InventoryContentUI panel reference.");
+            _slots = GetComponentsInChildren<InventorySlotView>(true);
+            if (_dragGhost != null) _dragGhost.gameObject.SetActive(false);
+        }
 
         void Update()
         {
-            if (SeedShopUI.IsOpen) return;
+            if (ShopUI != null && ShopUI.IsOpen) return;
             if (Input.GetKeyDown(KeyCode.I)) Toggle();
-        }
+            if (!IsOpen) return;
 
-        void OnDestroy()
-        {
-            UnlockGameplay();
+            RefreshSlots();
+            PointerOverUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
         }
 
         void OnDisable()
         {
-            UnlockGameplay();
             PointerOverUI = false;
+            Player?.SetGameplayLocked(false, GameplayLockSource);
         }
 
         public void Toggle()
         {
-            if (_open) CloseInventory();
+            if (IsOpen) CloseInventory();
             else OpenInventory();
         }
 
-        public void OpenInventory()
+        public void OpenInventory() => ShowPopup();
+
+        public void CloseInventory() => HidePopup();
+
+        protected override void OnPopupShown()
         {
-            _open = true;
             Player?.SetGameplayLocked(true, GameplayLockSource);
         }
 
-        public void CloseInventory()
+        protected override void OnPopupHidden()
         {
-            _open = false;
-            _dragSlot = -1;
+            // Runs on every hide path (CloseInventory, PopupParent.HideAll, ...), not just the
+            // explicit close, so a mid-drag close never leaves the ghost/tooltip stuck on screen.
+            ItemDetailPopup.Hide(this);
+            EndDrag();
             PointerOverUI = false;
-            UnlockGameplay();
-        }
-
-        void UnlockGameplay()
-        {
             Player?.SetGameplayLocked(false, GameplayLockSource);
         }
 
-        void OnGUI()
+        protected override void OnDestroy()
         {
-            if (!_open || State == null) { PointerOverUI = false; return; }
-            var art = PlaceholderArt.Art;
-            if (art == null || art.InventoryPlayer == null) { PointerOverUI = false; return; }
-
-            var oldContentColor = GUI.contentColor;
-            GUI.contentColor = new Color32(42, 30, 20, 255);
-
-            float scale = ResponsiveUILayout.InventoryScale(Screen.width, Screen.height);
-            float w = PanelNativeW * scale, h = PanelNativeH * scale;
-            var panelRect = ResponsiveUILayout.InventoryPanelRect(Screen.width, Screen.height);
-            float x = panelRect.x, y = panelRect.y;
-            var mouse = Event.current.mousePosition;
-            PointerOverUI = panelRect.Contains(mouse);
-
-            PlaceholderArt.DrawSprite(panelRect, art.InventoryPlayer);
-
-            float leftMargin = 4f * scale;
-            float topMargin = 4f * scale;
-            float slotW = 20f * scale;
-            float slotH = 20f * scale;
-            float dividerW = 1f * scale;
-            float dividerH = 1f * scale;
-            float rowGap = 10f * scale;
-
-            var slots = InventoryReadService?.Read(State.InventorySystem);
-            if (slots == null) { PointerOverUI = false; return; }
-            bool mouseUpUnhandled = Event.current.type == EventType.MouseUp && Event.current.button == 0;
-
-            for (int row = 0; row < Rows; row++)
-            {
-                for (int col = 0; col < Cols; col++)
-                {
-                    int slotIndex = row * Cols + col;
-                    float slotX = x + leftMargin + col * (slotW + dividerW);
-                    float slotY = y + topMargin + (row == 0 ? 0f : slotH + rowGap + (row - 1) * (slotH + dividerH));
-                    var slotRect = new Rect(slotX, slotY, slotW, slotH);
-                    var slot = slotIndex < slots.Length ? slots[slotIndex] : default;
-
-                    if (!slot.IsEmpty && slotIndex != _dragSlot)
-                        DrawItem(slotRect, slot);
-
-                    if (Event.current.type == EventType.MouseDown && Event.current.button == 0
-                        && slotRect.Contains(mouse) && !slot.IsEmpty)
-                    {
-                        _dragSlot = slotIndex;
-                        Event.current.Use();
-                    }
-                    else if (mouseUpUnhandled && slotRect.Contains(mouse) && _dragSlot >= 0)
-                    {
-                        if (InventoryService != null)
-                            InventoryService.Swap(State.InventorySystem, _dragSlot, slotIndex).GetAwaiter().GetResult();
-                        _dragSlot = -1;
-                        mouseUpUnhandled = false;
-                        Event.current.Use();
-                    }
-                }
-            }
-
-            // Dropped outside every slot (but still released) -> cancel the drag, snap back.
-            if (mouseUpUnhandled && _dragSlot >= 0)
-                _dragSlot = -1;
-
-            if (_dragSlot >= 0 && _dragSlot < slots.Length && !slots[_dragSlot].IsEmpty)
-            {
-                var followRect = new Rect(mouse.x - slotW * 0.4f, mouse.y - slotH * 0.4f, slotW * 0.8f, slotH * 0.8f);
-                DrawItem(followRect, slots[_dragSlot]);
-            }
-
-            GUI.Label(new Rect(x, y - 20f, w, 20f), "Inventory (I to close) — drag to reorder");
-            GUI.contentColor = oldContentColor;
+            Player?.SetGameplayLocked(false, GameplayLockSource);
+            if (Instance == this) Instance = null;
+            base.OnDestroy();
         }
 
-        static void DrawItem(Rect rect, InventorySlotData slot)
+        void RefreshSlots()
         {
-            var icon = PlaceholderArt.ItemIcon(slot.ItemId);
-            if (icon != null)
+            if (State?.InventorySystem == null || _slots == null) return;
+            var data = InventoryReadService != null ? InventoryReadService.Read(State.InventorySystem) : null;
+
+            for (int i = 0; i < _slots.Length; i++)
             {
-                // B2 (Sprint 1): tint the shared seed sprite per crop (turnip vs potato).
-                var prevColor = GUI.color;
-                GUI.color = PlaceholderArt.ItemTint(slot.ItemId);
-                PlaceholderArt.DrawSpriteFit(PlaceholderArt.Shrink(rect, 0.15f), icon);
-                GUI.color = prevColor;
+                var slot = _slots[i];
+                if (slot == null) continue;
+
+                var slotData = data != null && slot.SlotIndex >= 0 && slot.SlotIndex < data.Length
+                    ? data[slot.SlotIndex]
+                    : default;
+                bool hideIcon = slot.SlotIndex == _dragSlot;
+                var icon = slotData.IsEmpty ? null : PlaceholderArt.ItemIcon(slotData.ItemId);
+                var tint = slotData.IsEmpty ? Color.white : PlaceholderArt.ItemTint(slotData.ItemId);
+                slot.SetContent(slotData.ItemId, slotData.Count, icon, tint, hideIcon);
             }
-            if (slot.Count > 1)
-                GUI.Label(new Rect(rect.xMax - 22f, rect.yMax - 18f, 20f, 16f), slot.Count.ToString());
+        }
+
+        // --- Drag-to-swap, driven by InventorySlotView's pointer/drag callbacks ---
+
+        public void BeginDrag(int sourceSlot, Sprite icon, Color tint)
+        {
+            _dragSlot = sourceSlot;
+            ItemDetailPopup.Hide(this);
+            if (_dragGhost == null) return;
+            _dragGhost.sprite = icon;
+            _dragGhost.color = tint;
+            _dragGhost.enabled = icon != null;
+            _dragGhost.transform.SetAsLastSibling();
+            _dragGhost.gameObject.SetActive(true);
+        }
+
+        public void UpdateDrag(PointerEventData eventData)
+        {
+            if (_dragSlot < 0 || _dragGhost == null) return;
+            var parentRect = _dragGhost.transform.parent as RectTransform;
+            if (parentRect == null) return;
+
+            var canvas = _dragGhost.canvas;
+            var eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera
+                : null;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    parentRect, eventData.position, eventCamera, out var local))
+                _dragGhost.rectTransform.anchoredPosition = local;
+        }
+
+        /// <summary>Ends the shared drag gesture without swapping — cancels if dropped outside any slot.</summary>
+        public void EndDrag()
+        {
+            _dragSlot = -1;
+            if (_dragGhost != null) _dragGhost.gameObject.SetActive(false);
+        }
+
+        /// <summary>Called on the slot under the cursor when a drag is released over it.</summary>
+        public void CompleteDrag(int destinationSlot)
+        {
+            int source = _dragSlot;
+            if (source >= 0 && destinationSlot != source && InventoryService != null && State?.InventorySystem != null)
+                InventoryService.Swap(State.InventorySystem, source, destinationSlot).GetAwaiter().GetResult();
+            EndDrag();
         }
     }
 }

@@ -35,6 +35,13 @@
       },
       "hash": "c00ca78f17f36c8071999e2b31cb4cddec9896f7"
     },
+    "com.pixelplacement.itween": {
+      "version": "https://github.com/PixelWizards/iTween.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "bf8fd3ddddcbf5cdf2893857cd5d0d4d0095bc4a"
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 0,
@@ -151,7 +158,7 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.pipeline": {
-      "version": "0.5.0-exp.1",
+      "version": "0.6.0-exp.1",
       "depth": 0,
       "source": "registry",
       "dependencies": {

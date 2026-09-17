@@ -1,6 +1,7 @@
 using Prototype.Application;
 using Prototype.Domain;
 using Prototype.Infrastructure;
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -14,8 +15,11 @@ namespace Prototype.Application
         public InventoryService InventoryService;
         public static bool PointerOverUI { get; private set; }
         const int SlotCount = 12;
-        readonly Image[] _items = new Image[SlotCount];
-        readonly Image[] _highlights = new Image[SlotCount];
+        [Header("Editor-authored NavigationBarUI")]
+        [SerializeField] RectTransform _navigationBar;
+        [SerializeField] Button[] _slotButtons = new Button[SlotCount];
+        [SerializeField] Image[] _items = new Image[SlotCount];
+        [SerializeField] Image[] _highlights = new Image[SlotCount];
 
         void Awake()
         {
@@ -26,16 +30,20 @@ namespace Prototype.Application
         {
             var canvas = GetComponentInParent<Canvas>();
             if (canvas == null) return; // Layout must be authored in the scene.
-            var bar = transform.Find("NavigationBar");
-            if (bar == null) return;
+            if (_navigationBar == null || _slotButtons == null || _slotButtons.Length != SlotCount ||
+                _items == null || _items.Length != SlotCount || _highlights == null || _highlights.Length != SlotCount)
+            {
+                Debug.LogWarning("ToolbarCanvasUI is missing serialized NavigationBarUI slot references. Assign all 12 slots in the Inspector.");
+                return;
+            }
             for (int i = 0; i < SlotCount; i++)
             {
-                var slot = bar.Find($"Slot_{i + 1:00}");
-                if (slot == null) return;
-                _items[i] = slot.Find("Item")?.GetComponent<Image>();
-                _highlights[i] = slot.Find("Active")?.GetComponent<Image>();
-                if (_items[i] == null || _highlights[i] == null) return;
-                var button = slot.GetComponent<Button>();
+                if (_slotButtons[i] == null || _items[i] == null || _highlights[i] == null)
+                {
+                    Debug.LogWarning($"ToolbarCanvasUI slot {i + 1} has an incomplete serialized reference set.");
+                    return;
+                }
+                var button = _slotButtons[i];
                 if (button != null)
                 {
                     int index = i;
@@ -45,7 +53,7 @@ namespace Prototype.Application
             }
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 100;
-            if (FindFirstObjectByType<EventSystem>() == null)
+            if (FindAnyObjectByType<EventSystem>() == null)
             {
                 var events = new GameObject("EventSystem");
                 events.AddComponent<EventSystem>();
@@ -58,6 +66,8 @@ namespace Prototype.Application
 
         void Update()
         {
+            // Item detail is intentionally available from the inventory only, not the navbar.
+            ItemDetailPopup.Hide(this);
             if (Player == null || Player.State == null) return;
             if (_items[0] == null || _highlights[0] == null) return;
             var inv = Player.State.InventorySystem;

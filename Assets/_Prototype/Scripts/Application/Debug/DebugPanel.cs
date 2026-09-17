@@ -17,6 +17,7 @@ namespace Prototype.Application
         public GameState State;
         public IClockService ClockService;
         public IInventoryService InventoryService;
+        internal SeedShopUI ShopUI;                // set by GameManager; replaces the old static singleton lookup
         public IGameplayService GameplayService;
         public IGameWorldService WorldService;
         public PlayerController Player;
@@ -28,7 +29,7 @@ namespace Prototype.Application
 
         void Update()
         {
-            if (!SeedShopUI.IsOpen && Input.GetKeyDown(KeyCode.F1)) ToggleOpen();
+            if ((ShopUI == null || !ShopUI.IsOpen) && Input.GetKeyDown(KeyCode.F1)) ToggleOpen();
             _frameCount++;
             _fpsAccum += Time.deltaTime;
             if (_fpsAccum >= 0.5f) { _fps = _frameCount / _fpsAccum; _frameCount = 0; _fpsAccum = 0; }
@@ -72,7 +73,18 @@ namespace Prototype.Application
 
         void OnGUI()
         {
-            if (!_open || State == null) { PointerOverUI = false; return; }
+            if (State == null) { PointerOverUI = false; return; }
+
+            // Keep a visible entry point in Play Mode. The full panel remains opt-in so the
+            // debug overlay does not lock gameplay until the user opens it.
+            if (!_open)
+            {
+                var toggleRect = new Rect(8f, 8f, 118f, 24f);
+                PointerOverUI = toggleRect.Contains(Event.current.mousePosition);
+                if (GUI.Button(toggleRect, "DEBUG (F1)")) Open();
+                return;
+            }
+
             float scale = ResponsiveUILayout.DebugPanelScale(Screen.width, Screen.height);
             var panelRect = ResponsiveUILayout.DebugPanelRect(Screen.width, Screen.height);
             int w = (int)ResponsiveUILayout.DebugNativeW;
@@ -82,7 +94,7 @@ namespace Prototype.Application
 
             var oldMatrix = GUI.matrix;
             var oldContentColor = GUI.contentColor;
-            GUI.contentColor = new Color32(42, 30, 20, 255);
+            GUI.contentColor = Color.white;
             GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), panelRect.position);
             GUI.Box(new Rect(x, y, w, ResponsiveUILayout.DebugNativeH), "DEBUG (F1)");
             float by = y + 24;

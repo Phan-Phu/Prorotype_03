@@ -81,35 +81,35 @@ MonoBehaviour:
     DisplayName: Turnip Seed
     Description: Plant this seed on prepared soil.
     IconPath: Assets/Sprite Textures/Objects/ParsnipSeeds.png
-    IconSpriteName:
+    IconSpriteName: 
     Icon: {fileID: 21300000, guid: 7da78110e28e0f74aaa3ef4a41f4c0ed, type: 3}
     Stackable: 1
   - ItemId: potato_seed
     DisplayName: Potato Seed
     Description: Plant this seed on prepared soil.
     IconPath: Assets/Sprite Textures/Objects/ParsnipSeeds.png
-    IconSpriteName:
+    IconSpriteName: 
     Icon: {fileID: 21300000, guid: 7da78110e28e0f74aaa3ef4a41f4c0ed, type: 3}
     Stackable: 1
   - ItemId: turnip
     DisplayName: Turnip
     Description: A turnip harvested from a mature crop.
     IconPath: Assets/Sprite Textures/Objects/ParsnipSeeds.png
-    IconSpriteName:
+    IconSpriteName: 
     Icon: {fileID: 21300000, guid: 7da78110e28e0f74aaa3ef4a41f4c0ed, type: 3}
     Stackable: 1
   - ItemId: potato
     DisplayName: Potato
     Description: A potato harvested from a mature crop.
     IconPath: Assets/Sprite Textures/Objects/ParsnipSeeds.png
-    IconSpriteName:
+    IconSpriteName: 
     Icon: {fileID: 21300000, guid: 7da78110e28e0f74aaa3ef4a41f4c0ed, type: 3}
     Stackable: 1
   - ItemId: wood
     DisplayName: Wood
     Description: Useful wood collected from chopped trees.
     IconPath: Assets/Sprite Textures/Objects/Wood.png
-    IconSpriteName:
+    IconSpriteName: 
     Icon: {fileID: 21300000, guid: e26dc0d638731ec47abe9c4b3cae62ac, type: 3}
     Stackable: 1
   NpcInteractionRadiusTiles: 1.25
@@ -119,18 +119,27 @@ MonoBehaviour:
     X: 8
     Y: 17
     Lines:
-    - "Chào buổi sáng! Ruộng nhỏ cũng thành chuyện lớn nếu ngày nào cũng chăm."
-    - "Cây đã gieo thì nhớ tưới trước khi ngủ nhé. Đất khô là cây đứng yên đấy."
-    - "Nếu hôm nay thu hoạch được, thử nghĩ xem mai sẽ trồng thêm ô nào."
-    - "Tôi thích nhìn mảnh ruộng đổi màu sau mỗi lần cuốc — rất dễ biết mình đã làm được gì."
+    - "Ch\xE0o bu\u1ED5i s\xE1ng! Ru\u1ED9ng nh\u1ECF c\u0169ng th\xE0nh chuy\u1EC7n
+      l\u1EDBn n\u1EBFu ng\xE0y n\xE0o c\u0169ng ch\u0103m."
+    - "C\xE2y \u0111\xE3 gieo th\xEC nh\u1EDB t\u01B0\u1EDBi tr\u01B0\u1EDBc khi
+      ng\u1EE7 nh\xE9. \u0110\u1EA5t kh\xF4 l\xE0 c\xE2y \u0111\u1EE9ng y\xEAn \u0111\u1EA5y."
+    - "N\u1EBFu h\xF4m nay thu ho\u1EA1ch \u0111\u01B0\u1EE3c, th\u1EED ngh\u0129
+      xem mai s\u1EBD tr\u1ED3ng th\xEAm \xF4 n\xE0o."
+    - "T\xF4i th\xEDch nh\xECn m\u1EA3nh ru\u1ED9ng \u0111\u1ED5i m\xE0u sau m\u1ED7i
+      l\u1EA7n cu\u1ED1c \u2014 r\u1EA5t d\u1EC5 bi\u1EBFt m\xECnh \u0111\xE3 l\xE0m
+      \u0111\u01B0\u1EE3c g\xEC."
     FallbackColor: {r: 0.9, g: 0.55, b: 0.95, a: 1}
   - Id: butch
     DisplayName: Butch
     X: 17
     Y: 12
     Lines:
-    - "Thấy mấy cây phía kia không? Chặt vài cây là có thêm việc trong lúc chờ mùa vụ lớn."
-    - "Rìu tốn sức hơn cuốc, nên đừng quên giữ stamina cho ruộng trước."
-    - "Gốc cây sẽ mọc lại sau vài ngày. Tôi hay quay lại đúng lúc vụ củ cải tới kỳ."
-    - "Gỗ bán được, nhưng đừng bỏ ruộng chỉ vì vài khúc củi nhanh tay."
+    - "Th\u1EA5y m\u1EA5y c\xE2y ph\xEDa kia kh\xF4ng? Ch\u1EB7t v\xE0i c\xE2y l\xE0
+      c\xF3 th\xEAm vi\u1EC7c trong l\xFAc ch\u1EDD m\xF9a v\u1EE5 l\u1EDBn."
+    - "R\xECu t\u1ED1n s\u1EE9c h\u01A1n cu\u1ED1c, n\xEAn \u0111\u1EEBng qu\xEAn
+      gi\u1EEF stamina cho ru\u1ED9ng tr\u01B0\u1EDBc."
+    - "G\u1ED1c c\xE2y s\u1EBD m\u1ECDc l\u1EA1i sau v\xE0i ng\xE0y. T\xF4i hay quay
+      l\u1EA1i \u0111\xFAng l\xFAc v\u1EE5 c\u1EE7 c\u1EA3i t\u1EDBi k\u1EF3."
+    - "G\u1ED7 b\xE1n \u0111\u01B0\u1EE3c, nh\u01B0ng \u0111\u1EEBng b\u1ECF ru\u1ED9ng
+      ch\u1EC9 v\xEC v\xE0i kh\xFAc c\u1EE7i nhanh tay."
     FallbackColor: {r: 0.75, g: 0.36, b: 0.18, a: 1}

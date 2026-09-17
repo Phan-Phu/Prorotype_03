@@ -163,53 +163,5 @@ namespace Prototype.Application
 
         static readonly Color TurnipTint = new Color(0.85f, 0.55f, 0.95f); // pale purple, like a turnip bulb
         static readonly Color PotatoTint = new Color(0.80f, 0.60f, 0.30f); // earthy tan/brown, like a potato skin
-
-        /// <summary>
-        /// Draws a Sprite via its texture + UV sub-rect. Works uniformly whether the sprite is
-        /// Single-mode (UV covers the whole texture) or packed in a multi-sprite atlas (UV is its
-        /// sub-region) — shared by the remaining IMGUI debug/inventory fallback screens so there's
-        /// one place that gets the UV maths right.
-        /// </summary>
-        public static void DrawSprite(Rect screenRect, Sprite sprite)
-        {
-            var r = sprite.rect;
-            var tex = sprite.texture;
-            var uv = new Rect(r.x / tex.width, r.y / tex.height, r.width / tex.width, r.height / tex.height);
-            GUI.DrawTextureWithTexCoords(screenRect, tex, uv);
-        }
-
-        /// <summary>Draws an icon without stretching it, centered inside the supplied slot.</summary>
-        public static void DrawSpriteFit(Rect screenRect, Sprite sprite)
-        {
-            if (sprite == null || sprite.texture == null) return;
-            float sourceAspect = sprite.rect.width / (float)sprite.rect.height;
-            float targetAspect = screenRect.width / screenRect.height;
-            Rect fitted = screenRect;
-            if (sourceAspect > targetAspect)
-            {
-                fitted.height = screenRect.width / sourceAspect;
-                fitted.y += (screenRect.height - fitted.height) * 0.5f;
-            }
-            else
-            {
-                fitted.width = screenRect.height * sourceAspect;
-                fitted.x += (screenRect.width - fitted.width) * 0.5f;
-            }
-            // The source item sheets include generous transparent padding. Scale the fitted
-            // canvas up so the visible pixel art matches the design's slot occupancy.
-            const float PixelArtIconScale = 1.45f;
-            float extraW = fitted.width * (PixelArtIconScale - 1f) * 0.5f;
-            float extraH = fitted.height * (PixelArtIconScale - 1f) * 0.5f;
-            fitted = new Rect(fitted.x - extraW, fitted.y - extraH,
-                fitted.width + extraW * 2f, fitted.height + extraH * 2f);
-            DrawSprite(fitted, sprite);
-        }
-
-        /// <summary>Shrinks a Rect toward its centre by pad01 (0..0.5) on each side — used to inset icons within a slot.</summary>
-        public static Rect Shrink(Rect r, float pad01)
-        {
-            float dx = r.width * pad01, dy = r.height * pad01;
-            return new Rect(r.x + dx, r.y + dy, r.width - dx * 2f, r.height - dy * 2f);
-        }
     }
 }
